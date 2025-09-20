@@ -16,13 +16,13 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const { signIn, loading, user } = useAuth()
 
-  // Redirect to dashboard or return URL when user becomes authenticated
+  // 检查用户状态
   useEffect(() => {
+    // 如果已经登录，提示用户可以直接使用功能
     if (user && !loading) {
-      const returnTo = searchParams.get('returnTo')
-      router.push(returnTo && returnTo.startsWith('/') ? returnTo : "/dashboard")
+      console.log('用户已登录，可以使用功能')
     }
-  }, [user, loading, router, searchParams])
+  }, [user, loading])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,10 +36,17 @@ export function LoginForm() {
         return
       }
 
-      if (data.user) {
-        // The AuthProvider will handle the redirect via auth state change
-        // Just refresh to update the server-side session
-        router.refresh()
+      if (data?.user) {
+        const returnTo = searchParams.get('returnTo')
+        const redirectPath = returnTo && returnTo.startsWith('/') ? returnTo : "/dashboard"
+
+        // 登录成功后跳转 - 等待一个短暂的延迟确保 session 完全保存
+        console.log('登录成功，跳转到:', redirectPath)
+
+        // 给 cookies 一点时间设置
+        setTimeout(() => {
+          router.push(redirectPath)
+        }, 100)
       }
     } catch (err) {
       setError("登录失败，请重试")

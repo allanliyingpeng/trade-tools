@@ -3,10 +3,12 @@ export interface UserSettings {
   id: string
   user_id: string
   display_name: string | null
+  company_name: string | null
   avatar_url: string | null
   language: string
   timezone: string
   currency: string
+  default_source_lang: string
   favorite_currencies: string[]
   email_notifications: boolean
   created_at: string
@@ -31,9 +33,11 @@ export interface UsageStats {
 // 个人中心相关的表单类型
 export interface ProfileFormData {
   display_name: string
+  company_name: string
   language: string
   timezone: string
   currency: string
+  default_source_lang: string
   favorite_currencies: string[]
   email_notifications: boolean
 }

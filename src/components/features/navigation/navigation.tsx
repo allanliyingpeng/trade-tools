@@ -54,6 +54,9 @@ export function Navigation() {
   const isMobile = useMobile()
   const { user, signOut, loading } = useAuth()
 
+  // 调试用户状态
+  console.log('Navigation component user state:', { user: !!user, email: user?.email, loading })
+
   const NavigationItems = () => (
     <nav className="space-y-2">
       {navigationItems.map((item) => {

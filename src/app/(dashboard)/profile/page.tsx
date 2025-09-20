@@ -20,15 +20,21 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">个人中心</h1>
-          <p className="text-muted-foreground">管理您的个人信息和账户设置</p>
+      <div className="min-h-screen bg-background">
+        <div className="w-full py-16 md:py-20 lg:py-24 bg-background">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto text-center">
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">个人中心</h1>
+              <p className="mt-6 text-lg sm:text-xl text-muted-foreground">管理您的个人信息和账户设置</p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">加载中...</p>
+        <div className="w-full py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-2 text-muted-foreground">加载中...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -37,25 +43,38 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">个人中心</h1>
-          <p className="text-muted-foreground">请先登录以访问个人中心</p>
+      <div className="min-h-screen bg-background">
+        <div className="w-full py-16 md:py-20 lg:py-24 bg-background">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto text-center">
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">个人中心</h1>
+              <p className="mt-6 text-lg sm:text-xl text-muted-foreground">请先登录以访问个人中心</p>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">个人中心</h1>
-        <p className="text-muted-foreground">
-          欢迎回来，{userSettings?.display_name || user.email}
-        </p>
+    <div className="min-h-screen bg-background">
+      {/* Header Section */}
+      <div className="w-full py-16 md:py-20 lg:py-24 bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">个人中心</h1>
+            <p className="mt-6 text-lg sm:text-xl text-muted-foreground">
+              欢迎回来，{userSettings?.display_name || user.email}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      {/* Content Section */}
+      <div className="w-full py-8 md:py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
@@ -163,7 +182,10 @@ export default function ProfilePage() {
             </div>
           </div>
         </TabsContent>
-      </Tabs>
+            </Tabs>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

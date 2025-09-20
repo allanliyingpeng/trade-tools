@@ -9,7 +9,7 @@ export class ProfileService {
         .from('user_settings')
         .select('*')
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
 
       return { data, error }
     } catch (err) {
@@ -50,10 +50,12 @@ export class ProfileService {
       const defaultSettings = {
         user_id: userId,
         display_name: null,
+        company_name: null,
         avatar_url: null,
         language: 'zh-CN',
         timezone: 'Asia/Shanghai',
         currency: 'CNY',
+        default_source_lang: 'zh-CN',
         favorite_currencies: ['USD', 'EUR', 'CNY'],
         email_notifications: true,
         ...settings,

@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 监听认证状态变化
     const { data: { subscription } } = authService.onAuthStateChange(
       (event, session) => {
+        console.log('认证状态变化:', { event, user: session?.user?.email, hasSession: !!session })
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
@@ -60,9 +61,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    console.log('AuthProvider signIn 开始')
     setLoading(true)
     try {
       const result = await authService.signIn({ email, password })
+      console.log('AuthProvider signIn 结果:', { data: !!result.data, error: result.error })
+
+      // 如果登录成功，立即更新状态
+      if (result.data?.user && !result.error) {
+        console.log('立即更新用户状态')
+        setUser(result.data.user)
+        setSession(result.data.session)
+      }
+
       return result
     } finally {
       setLoading(false)

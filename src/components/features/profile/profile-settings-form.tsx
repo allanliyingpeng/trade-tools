@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AvatarUpload } from "./avatar-upload"
 import { ProfileService } from "@/lib/supabase/profile"
+import { LocalProfileStorage } from "@/lib/profile-storage"
 import { useAuth } from "@/components/providers/auth-provider"
 import {
   ProfileFormData,
@@ -27,9 +28,11 @@ export function ProfileSettingsForm({ onSettingsUpdate }: ProfileSettingsFormPro
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [formData, setFormData] = useState<ProfileFormData>({
     display_name: '',
+    company_name: '',
     language: 'zh-CN',
     timezone: 'Asia/Shanghai',
     currency: 'CNY',
+    default_source_lang: 'zh-CN',
     favorite_currencies: ['USD', 'EUR', 'CNY'],
     email_notifications: true,
   })
@@ -49,43 +52,81 @@ export function ProfileSettingsForm({ onSettingsUpdate }: ProfileSettingsFormPro
 
     setIsLoading(true)
     try {
+      console.log('开始加载用户设置，用户ID:', user.id)
+
+      // 先尝试从Supabase加载
       const { data, error } = await ProfileService.getUserSettings(user.id)
+      console.log('获取用户设置结果:', { data, error })
 
       if (error) {
-        // 如果没有设置记录，创建默认设置
-        if (error.code === 'PGRST116') {
-          const { data: newSettings, error: createError } = await ProfileService.createUserSettings(user.id)
-          if (createError) {
-            setError('创建用户设置失败')
-            return
-          }
-          if (newSettings) {
-            setSettings(newSettings)
-            setFormData({
-              display_name: newSettings.display_name || '',
-              language: newSettings.language,
-              timezone: newSettings.timezone,
-              currency: newSettings.currency,
-              favorite_currencies: newSettings.favorite_currencies,
-              email_notifications: newSettings.email_notifications,
-            })
-          }
+        console.log('Supabase加载失败，尝试使用本地存储')
+        // 尝试从本地存储加载
+        const localSettings = LocalProfileStorage.getUserSettings(user.id)
+
+        if (localSettings) {
+          console.log('成功从本地存储加载设置:', localSettings)
+          setSettings(localSettings)
+          setFormData({
+            display_name: localSettings.display_name || '',
+            company_name: localSettings.company_name || '',
+            language: localSettings.language,
+            timezone: localSettings.timezone,
+            currency: localSettings.currency,
+            default_source_lang: localSettings.default_source_lang,
+            favorite_currencies: localSettings.favorite_currencies,
+            email_notifications: localSettings.email_notifications,
+          })
         } else {
-          setError('加载用户设置失败')
+          console.log('本地存储中也没有设置，创建默认设置')
+          // 创建默认设置并保存到本地存储
+          const defaultSettings = LocalProfileStorage.createDefaultSettings(user.id)
+          setSettings(defaultSettings)
+          setFormData({
+            display_name: defaultSettings.display_name || '',
+            company_name: defaultSettings.company_name || '',
+            language: defaultSettings.language,
+            timezone: defaultSettings.timezone,
+            currency: defaultSettings.currency,
+            default_source_lang: defaultSettings.default_source_lang,
+            favorite_currencies: defaultSettings.favorite_currencies,
+            email_notifications: defaultSettings.email_notifications,
+          })
         }
       } else if (data) {
+        console.log('成功加载用户设置:', data)
         setSettings(data)
         setFormData({
           display_name: data.display_name || '',
+          company_name: data.company_name || '',
           language: data.language,
           timezone: data.timezone,
           currency: data.currency,
+          default_source_lang: data.default_source_lang,
           favorite_currencies: data.favorite_currencies,
           email_notifications: data.email_notifications,
         })
       }
     } catch (err) {
-      setError('加载用户设置失败')
+      console.error('加载用户设置时发生异常，使用本地存储:', err)
+
+      // 作为最后的备选方案，使用本地存储
+      try {
+        const localSettings = LocalProfileStorage.getUserSettings(user.id) || LocalProfileStorage.createDefaultSettings(user.id)
+        setSettings(localSettings)
+        setFormData({
+          display_name: localSettings.display_name || '',
+          company_name: localSettings.company_name || '',
+          language: localSettings.language,
+          timezone: localSettings.timezone,
+          currency: localSettings.currency,
+          default_source_lang: localSettings.default_source_lang,
+          favorite_currencies: localSettings.favorite_currencies,
+          email_notifications: localSettings.email_notifications,
+        })
+      } catch (localErr) {
+        console.error('本地存储也失败:', localErr)
+        setError(`加载用户设置失败: ${err instanceof Error ? err.message : '未知错误'}`)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -100,11 +141,26 @@ export function ProfileSettingsForm({ onSettingsUpdate }: ProfileSettingsFormPro
     setSuccess('')
 
     try {
+      console.log('提交表单数据:', formData)
+      console.log('用户ID:', user.id)
+
+      // 先尝试保存到Supabase
       const { data, error } = await ProfileService.updateUserSettings(user.id, formData)
+      console.log('更新结果:', { data, error })
 
       if (error) {
-        setError('保存设置失败，请重试')
+        console.log('Supabase保存失败，使用本地存储')
+        // 如果Supabase失败，保存到本地存储
+        const localSettings = LocalProfileStorage.saveUserSettings(user.id, formData)
+        setSettings(localSettings)
+        setSuccess('设置已保存到本地存储（云端同步暂时不可用）')
+        onSettingsUpdate?.(localSettings)
+
+        // 3秒后清除成功消息
+        setTimeout(() => setSuccess(''), 3000)
       } else if (data) {
+        // 成功保存到Supabase，同时也保存到本地存储作为备份
+        LocalProfileStorage.saveUserSettings(user.id, formData)
         setSettings(data)
         setSuccess('设置保存成功')
         onSettingsUpdate?.(data)
@@ -113,7 +169,21 @@ export function ProfileSettingsForm({ onSettingsUpdate }: ProfileSettingsFormPro
         setTimeout(() => setSuccess(''), 3000)
       }
     } catch (err) {
-      setError('保存设置失败，请重试')
+      console.error('保存设置时发生异常，尝试本地存储:', err)
+
+      try {
+        // 作为备选方案，保存到本地存储
+        const localSettings = LocalProfileStorage.saveUserSettings(user.id, formData)
+        setSettings(localSettings)
+        setSuccess('设置已保存到本地存储')
+        onSettingsUpdate?.(localSettings)
+
+        // 3秒后清除成功消息
+        setTimeout(() => setSuccess(''), 3000)
+      } catch (localErr) {
+        console.error('本地存储也失败:', localErr)
+        setError(`保存设置失败: ${err instanceof Error ? err.message : '未知错误'}`)
+      }
     } finally {
       setIsSaving(false)
     }
@@ -186,13 +256,42 @@ export function ProfileSettingsForm({ onSettingsUpdate }: ProfileSettingsFormPro
             />
           </div>
 
+          {/* 公司名称 */}
+          <div className="space-y-2">
+            <Label htmlFor="company_name">公司名称</Label>
+            <Input
+              id="company_name"
+              type="text"
+              value={formData.company_name}
+              onChange={(e) => handleInputChange('company_name', e.target.value)}
+              placeholder="请输入公司名称"
+            />
+          </div>
+
           {/* 语言设置 */}
           <div className="space-y-2">
-            <Label htmlFor="language">语言</Label>
+            <Label htmlFor="language">界面语言</Label>
             <select
               id="language"
               value={formData.language}
               onChange={(e) => handleInputChange('language', e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {LANGUAGE_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 默认源语言 */}
+          <div className="space-y-2">
+            <Label htmlFor="default_source_lang">默认翻译源语言</Label>
+            <select
+              id="default_source_lang"
+              value={formData.default_source_lang}
+              onChange={(e) => handleInputChange('default_source_lang', e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               {LANGUAGE_OPTIONS.map(option => (

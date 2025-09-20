@@ -82,7 +82,9 @@ export default function GlossaryPage() {
   const displayTerms = getDisplayTerms()
 
   return (
-    <div className="space-y-6">
+    <div className="w-full py-16">
+      <div className="max-w-7xl mx-auto px-16">
+        <div className="space-y-8">
       {/* 页面标题 */}
       <div className="flex items-center gap-3">
         <Book className="h-8 w-8 text-primary" />
@@ -315,6 +317,8 @@ export default function GlossaryPage() {
           )}
         </DialogContent>
       </Dialog>
+        </div>
+      </div>
     </div>
   )
 }
