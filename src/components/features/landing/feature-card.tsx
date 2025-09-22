@@ -1,26 +1,48 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/components/providers/auth-provider"
-import { LucideIcon } from "lucide-react"
+import { ToolDialog } from "@/components/tool-dialog/ToolDialog"
 import { cn } from "@/lib/utils"
+import type { Feature } from "@/data/features"
+
+// 动态导入对话框组件
+import dynamic from 'next/dynamic'
+
+const ModernTranslateDialog = dynamic(() => import('@/components/tool-dialog/ModernTranslateDialog'), {
+  loading: () => <div className="p-4 text-center">加载中...</div>
+})
+
+const CurrencyDialog = dynamic(() => import('@/components/tool-dialog/CurrencyDialog'), {
+  loading: () => <div className="p-4 text-center">加载中...</div>
+})
+
+const QuotationCalculatorDialog = dynamic(() => import('@/components/QuotationCalculatorDialog'), {
+  loading: () => <div className="p-4 text-center">加载中...</div>
+})
+
+const ModernTermDialog = dynamic(() => import('@/components/tool-dialog/ModernTermDialog'), {
+  loading: () => <div className="p-4 text-center">加载中...</div>
+})
+
+const TimezoneDialog = dynamic(() => import('@/components/tool-dialog/TimezoneDialog'), {
+  loading: () => <div className="p-4 text-center">加载中...</div>
+})
 
 interface FeatureCardProps {
-  feature: {
-    id: string
-    title: string
-    description: string
-    icon: LucideIcon
-    href: string
-    color: string
-    gradient: string
-  }
+  feature: Feature
+  useDialog?: boolean
 }
 
-export function FeatureCard({ feature }: FeatureCardProps) {
+export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
   const { user } = useAuth()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [modernTermOpen, setModernTermOpen] = useState(false)
+  const [modernTranslateOpen, setModernTranslateOpen] = useState(false)
+  const [quotationCalculatorOpen, setQuotationCalculatorOpen] = useState(false)
   const Icon = feature.icon
 
   const handleClick = () => {
@@ -28,12 +50,50 @@ export function FeatureCard({ feature }: FeatureCardProps) {
       // 如果未登录，跳转到登录页面并携带返回参数
       return `/login?returnTo=${encodeURIComponent(feature.href)}`
     }
+
+    if (useDialog) {
+      if (feature.dialogType === 'term') {
+        // 对于术语查询，直接渲染 ModernTermDialog
+        setModernTermOpen(true)
+        return
+      }
+      if (feature.dialogType === 'translate') {
+        // 对于翻译功能，直接渲染 ModernTranslateDialog
+        setModernTranslateOpen(true)
+        return
+      }
+      if (feature.dialogType === 'quote') {
+        // 对于报价计算器，直接渲染 QuotationCalculatorDialog
+        setQuotationCalculatorOpen(true)
+        return
+      }
+      setDialogOpen(true)
+      return
+    }
+
     return feature.href
   }
 
-  const linkHref = user ? feature.href : handleClick()
+  const renderDialogContent = () => {
+    if (!user) return null
 
-  return (
+    switch (feature.dialogType) {
+      case 'translate':
+        return null // ModernTranslateDialog 管理自己的显示状态
+      case 'currency':
+        return <CurrencyDialog feature={feature} />
+      case 'quote':
+        return null // QuotationCalculatorDialog 管理自己的显示状态
+      case 'term':
+        return null // ModernTermDialog 管理自己的显示状态
+      case 'timezone':
+        return <TimezoneDialog feature={feature} />
+      default:
+        return <div className="p-4 text-center">功能开发中...</div>
+    }
+  }
+
+  const cardContent = (
     <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <div
         className={cn(
@@ -63,12 +123,63 @@ export function FeatureCard({ feature }: FeatureCardProps) {
           {feature.description}
         </CardDescription>
 
-        <Button asChild className="w-full group-hover:bg-primary/90">
-          <Link href={linkHref}>
-            开始使用
-          </Link>
+        <Button
+          className="w-full group-hover:bg-primary/90"
+          onClick={user && useDialog ? handleClick : undefined}
+          asChild={!user || !useDialog}
+        >
+          {!user || !useDialog ? (
+            <Link href={typeof handleClick() === 'string' ? handleClick() as string : feature.href}>
+              开始使用
+            </Link>
+          ) : (
+            <span>开始使用</span>
+          )}
         </Button>
       </CardContent>
     </Card>
+  )
+
+  if (!user || !useDialog) {
+    return cardContent
+  }
+
+  return (
+    <>
+      {feature.dialogType === 'term' ? (
+        <>
+          {cardContent}
+          <ModernTermDialog
+            open={modernTermOpen}
+            onOpenChange={setModernTermOpen}
+          />
+        </>
+      ) : feature.dialogType === 'translate' ? (
+        <>
+          {cardContent}
+          <ModernTranslateDialog
+            open={modernTranslateOpen}
+            onOpenChange={setModernTranslateOpen}
+          />
+        </>
+      ) : feature.dialogType === 'quote' ? (
+        <>
+          {cardContent}
+          <QuotationCalculatorDialog
+            open={quotationCalculatorOpen}
+            onOpenChange={setQuotationCalculatorOpen}
+          />
+        </>
+      ) : (
+        <ToolDialog
+          feature={feature}
+          trigger={cardContent}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+        >
+          {renderDialogContent()}
+        </ToolDialog>
+      )}
+    </>
   )
 }

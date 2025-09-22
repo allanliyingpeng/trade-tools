@@ -16,6 +16,16 @@ export interface Database {
         Insert: Omit<Trade, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Trade, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
       }
+      user_usage_limits: {
+        Row: UserUsageLimit
+        Insert: Omit<UserUsageLimit, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<UserUsageLimit, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+      }
+      workflow_usage_logs: {
+        Row: WorkflowUsageLog
+        Insert: Omit<WorkflowUsageLog, 'id' | 'created_at'>
+        Update: Partial<Omit<WorkflowUsageLog, 'id' | 'created_at'>>
+      }
     }
   }
 }
@@ -80,6 +90,32 @@ export interface Position {
   profit_loss_percentage: number
   created_at: string
   updated_at: string
+}
+
+export interface UserUsageLimit {
+  id: string
+  user_id: string
+  workflow_id?: string
+  limit_type: 'daily' | 'monthly' | 'total'
+  limit_count: number
+  used_count: number
+  reset_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkflowUsageLog {
+  id: string
+  user_id: string
+  workflow_id: string
+  workflow_run_id: string
+  tokens_used: number
+  execution_time: number
+  status: 'success' | 'failed'
+  error_message?: string
+  request_data?: any
+  response_data?: any
+  created_at: string
 }
 
 export type User = Profile

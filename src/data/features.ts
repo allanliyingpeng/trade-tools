@@ -15,26 +15,43 @@ export interface Feature {
   href: string
   color: string
   gradient: string
+  workflowId?: string
+  dialogType: 'translate' | 'currency' | 'quote' | 'term' | 'timezone'
+  defaultInputs?: Record<string, any>
 }
 
 export const features: Feature[] = [
   {
     id: 'translator',
     title: '智能翻译',
-    description: '基于腾讯TMT的专业外贸翻译，支持批量翻译和历史记录',
+    description: '基于AI的专业外贸翻译，支持批量翻译和历史记录',
     icon: Languages,
     href: '/translator',
     color: 'blue',
-    gradient: 'from-blue-500 to-cyan-500'
+    gradient: 'from-blue-500 to-cyan-500',
+    dialogType: 'translate',
+    workflowId: 'trade-translator',
+    defaultInputs: {
+      source_lang: 'auto',
+      target_lang: 'en',
+      domain: 'trade'
+    }
   },
   {
     id: 'exchange',
     title: '实时汇率',
-    description: '接入ECB央行数据，支持150+货币实时转换',
+    description: '智能汇率查询和计算，支持150+货币实时转换',
     icon: TrendingUp,
     href: '/exchange-rates',
     color: 'green',
-    gradient: 'from-green-500 to-emerald-500'
+    gradient: 'from-green-500 to-emerald-500',
+    dialogType: 'currency',
+    workflowId: 'currency-converter',
+    defaultInputs: {
+      from_currency: 'USD',
+      to_currency: 'CNY',
+      amount: 1
+    }
   },
   {
     id: 'quotation',
@@ -43,16 +60,28 @@ export const features: Feature[] = [
     icon: Calculator,
     href: '/quotation',
     color: 'purple',
-    gradient: 'from-purple-500 to-pink-500'
+    gradient: 'from-purple-500 to-pink-500',
+    dialogType: 'quote',
+    workflowId: 'quote-calculator',
+    defaultInputs: {
+      incoterm: 'FOB',
+      currency: 'USD'
+    }
   },
   {
     id: 'glossary',
     title: '术语速查',
-    description: '收录Incoterms 2020等500+专业术语，支持中英对照',
+    description: '收录Incoterms 2020等500+专业术语，智能查询和解释',
     icon: BookOpen,
     href: '/glossary',
     color: 'orange',
-    gradient: 'from-orange-500 to-red-500'
+    gradient: 'from-orange-500 to-red-500',
+    dialogType: 'term',
+    workflowId: 'term-lookup',
+    defaultInputs: {
+      category: 'all',
+      language: 'zh-cn'
+    }
   },
   {
     id: 'timezone',
@@ -61,6 +90,12 @@ export const features: Feature[] = [
     icon: Globe,
     href: '/timezone',
     color: 'indigo',
-    gradient: 'from-indigo-500 to-purple-500'
+    gradient: 'from-indigo-500 to-purple-500',
+    dialogType: 'timezone',
+    workflowId: 'timezone-converter',
+    defaultInputs: {
+      from_timezone: 'Asia/Shanghai',
+      to_timezone: 'America/New_York'
+    }
   }
 ]
