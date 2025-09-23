@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calculator, RefreshCw, Download, Copy, RotateCcw, Save,
-  Package, Truck, Currency, ChartBar, X, TrendingUp, Zap,
-  DollarSign, Bookmark, PieChart, Target
+  Package, Truck, Currency, ChartBar, X, TrendingUp,
+  DollarSign
 } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -12,21 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useExchangeRate } from '../hooks/useExchangeRate';
 
-interface QuoteData {
-  productCost: number;
-  packagingCost: number;
-  domesticShipping: number;
-  exportCost: number;
-  oceanFreight: number;
-  insurance: number;
-  targetMargin: number;
-  commission: number;
-  quantity: number;
-  currency: string;
-  exchangeRate: number;
-  initialInvestment: number;
-  expectedVolume: number;
-}
 
 interface QuoteResults {
   exw: {
@@ -132,7 +117,6 @@ export default function QuotationCalculatorDialog({
     rate: exchangeRate,
     loading: rateLoading,
     lastUpdate,
-    error: rateError,
     isCached,
     updateRate
   } = useExchangeRate(currency, 'CNY');
@@ -142,10 +126,10 @@ export default function QuotationCalculatorDialog({
   const packagingCostInput = useStableInput('0');
   const domesticShippingInput = useStableInput('0');
   const exportCostInput = useStableInput('0');
-  const exportCostRateInput = useStableInput('5');
+  const exportCostRateInput = useStableInput('0');
   const oceanFreightInput = useStableInput('0');
   const insuranceInput = useStableInput('0');
-  const targetMarginInput = useStableInput('20');
+  const targetMarginInput = useStableInput('0');
   const commissionInput = useStableInput('0');
   const quantityInput = useStableInput('1');
   const initialInvestmentInput = useStableInput('0');
@@ -172,35 +156,9 @@ export default function QuotationCalculatorDialog({
   const calculateExportCost = useCallback(() => {
     return exportCostInput.numericValue > 0
       ? exportCostInput.numericValue
-      : calculateBasicCost() * (exportCostRateInput.numericValue / 100);
-  }, [exportCostInput.numericValue, exportCostRateInput.numericValue, calculateBasicCost]);
+      : productCostInput.numericValue * (exportCostRateInput.numericValue / 100);
+  }, [exportCostInput.numericValue, exportCostRateInput.numericValue, productCostInput.numericValue]);
 
-  // 建议零售价计算
-  const calculateSuggestedPrice = useCallback((type: 'exw' | 'fob' | 'cif'): number => {
-    const basicCost = calculateBasicCost();
-    const exportCost = calculateExportCost();
-    const marginRate = targetMarginInput.numericValue / 100;
-
-    switch (type) {
-      case 'exw':
-        return marginRate > 0 ? basicCost / (1 - marginRate) : basicCost;
-      case 'fob':
-        const fobCost = basicCost + exportCost;
-        return marginRate > 0 ? fobCost / (1 - marginRate) : fobCost;
-      case 'cif':
-        const fobPrice = calculateSuggestedPrice('fob');
-        return fobPrice + oceanFreightInput.numericValue + insuranceInput.numericValue;
-      default:
-        return 0;
-    }
-  }, [calculateBasicCost, calculateExportCost, targetMarginInput.numericValue, oceanFreightInput.numericValue, insuranceInput.numericValue]);
-
-  const calculateExpectedProfit = useCallback(() => {
-    const cifPrice = calculateSuggestedPrice('cif');
-    const totalCost = calculateBasicCost() + calculateExportCost() +
-                     oceanFreightInput.numericValue + insuranceInput.numericValue;
-    return cifPrice - totalCost;
-  }, [calculateSuggestedPrice, calculateBasicCost, calculateExportCost, oceanFreightInput.numericValue, insuranceInput.numericValue]);
 
   // 修正的计算逻辑
   const calculateQuotes = useCallback((): QuoteResults => {
@@ -208,25 +166,21 @@ export default function QuotationCalculatorDialog({
     const basicCost = calculateBasicCost();
     const exportCost = calculateExportCost();
 
-    // 2. EXW价格计算 (包含目标利润率)
-    const exwCost = basicCost;
-    const exwPrice = targetMarginInput.numericValue > 0
-      ? exwCost / (1 - targetMarginInput.numericValue / 100)
-      : exwCost;
-    const exwProfit = exwPrice - exwCost;
+    // 2. EXW价格计算: EXW = 产品成本 + 包装费用 + 利润
+    const exwBaseCost = productCostInput.numericValue + packagingCostInput.numericValue;
+    const exwProfit = exwBaseCost * (targetMarginInput.numericValue / 100);
+    const exwPrice = exwBaseCost + exwProfit;
     const exwMargin = exwPrice > 0 ? (exwProfit / exwPrice) * 100 : 0;
 
-    // 3. FOB价格计算
-    const fobCost = exwCost + exportCost;
-    const fobPrice = targetMarginInput.numericValue > 0
-      ? fobCost / (1 - targetMarginInput.numericValue / 100)
-      : fobCost;
+    // 3. FOB价格计算: FOB = EXW + 国内运费 + 出口费用
+    const fobPrice = exwPrice + domesticShippingInput.numericValue + exportCost;
+    const fobCost = exwBaseCost + domesticShippingInput.numericValue + exportCost;
     const fobProfit = fobPrice - fobCost;
     const fobMargin = fobPrice > 0 ? (fobProfit / fobPrice) * 100 : 0;
 
-    // 4. CIF价格计算
-    const cifCost = fobCost + oceanFreightInput.numericValue + insuranceInput.numericValue;
+    // 4. CIF价格计算: CIF = FOB + 海运费 + 保险费
     const cifPrice = fobPrice + oceanFreightInput.numericValue + insuranceInput.numericValue;
+    const cifCost = fobCost + oceanFreightInput.numericValue + insuranceInput.numericValue;
     const cifProfit = cifPrice - cifCost;
     const cifMargin = cifPrice > 0 ? (cifProfit / cifPrice) * 100 : 0;
 
@@ -253,7 +207,7 @@ export default function QuotationCalculatorDialog({
     return {
       exw: {
         price: finalExwPrice,
-        cost: exwCost,
+        cost: exwBaseCost,
         profit: exwProfit,
         margin: exwMargin,
         commission: exwCommission
@@ -285,7 +239,7 @@ export default function QuotationCalculatorDialog({
         paybackPeriod
       }
     };
-  }, [calculateBasicCost, calculateExportCost, targetMarginInput.numericValue, oceanFreightInput.numericValue, insuranceInput.numericValue, commissionInput.numericValue, expectedVolumeInput.numericValue, initialInvestmentInput.numericValue, quantityInput.numericValue]);
+  }, [calculateBasicCost, calculateExportCost, productCostInput.numericValue, packagingCostInput.numericValue, domesticShippingInput.numericValue, targetMarginInput.numericValue, oceanFreightInput.numericValue, insuranceInput.numericValue, commissionInput.numericValue, expectedVolumeInput.numericValue, initialInvestmentInput.numericValue, quantityInput.numericValue]);
 
   // 防抖计算结果 - 避免频繁重新渲染
   const [results, setResults] = useState(() => calculateQuotes());
@@ -328,18 +282,18 @@ export default function QuotationCalculatorDialog({
   const saveTemplate = () => {
     if (typeof window !== 'undefined') {
       const template = {
-        productCost,
-        packagingCost,
-        domesticShipping,
-        exportCost,
-        exportCostRate,
-        oceanFreight,
-        insurance,
-        targetMargin,
-        commission,
-        quantity,
-        initialInvestment,
-        expectedVolume,
+        productCost: productCostInput.displayValue,
+        packagingCost: packagingCostInput.displayValue,
+        domesticShipping: domesticShippingInput.displayValue,
+        exportCost: exportCostInput.displayValue,
+        exportCostRate: exportCostRateInput.displayValue,
+        oceanFreight: oceanFreightInput.displayValue,
+        insurance: insuranceInput.displayValue,
+        targetMargin: targetMarginInput.displayValue,
+        commission: commissionInput.displayValue,
+        quantity: quantityInput.displayValue,
+        initialInvestment: initialInvestmentInput.displayValue,
+        expectedVolume: expectedVolumeInput.displayValue,
         currency,
         timestamp: Date.now()
       };
@@ -355,41 +309,27 @@ export default function QuotationCalculatorDialog({
       if (saved) {
         try {
           const template = JSON.parse(saved);
-          setProductCost(template.productCost || '0');
-          setPackagingCost(template.packagingCost || '0');
-          setDomesticShipping(template.domesticShipping || '0');
-          setExportCost(template.exportCost || '0');
-          setExportCostRate(template.exportCostRate || '5');
-          setOceanFreight(template.oceanFreight || '0');
-          setInsurance(template.insurance || '0');
-          setTargetMargin(template.targetMargin || '20');
-          setCommission(template.commission || '0');
-          setQuantity(template.quantity || '1');
-          setInitialInvestment(template.initialInvestment || '0');
-          setExpectedVolume(template.expectedVolume || '100');
+          productCostInput.setValue(template.productCost || '0');
+          packagingCostInput.setValue(template.packagingCost || '0');
+          domesticShippingInput.setValue(template.domesticShipping || '0');
+          exportCostInput.setValue(template.exportCost || '0');
+          exportCostRateInput.setValue(template.exportCostRate || '5');
+          oceanFreightInput.setValue(template.oceanFreight || '0');
+          insuranceInput.setValue(template.insurance || '0');
+          targetMarginInput.setValue(template.targetMargin || '20');
+          commissionInput.setValue(template.commission || '0');
+          quantityInput.setValue(template.quantity || '1');
+          initialInvestmentInput.setValue(template.initialInvestment || '0');
+          expectedVolumeInput.setValue(template.expectedVolume || '100');
           if (template.currency) {
             setCurrency(template.currency);
           }
-          // 更新解析值
-          setParsedValues({
-            productCost: parseFloat(template.productCost) || 0,
-            packagingCost: parseFloat(template.packagingCost) || 0,
-            domesticShipping: parseFloat(template.domesticShipping) || 0,
-            exportCost: parseFloat(template.exportCost) || 0,
-            oceanFreight: parseFloat(template.oceanFreight) || 0,
-            insurance: parseFloat(template.insurance) || 0,
-            targetMargin: parseFloat(template.targetMargin) || 20,
-            commission: parseFloat(template.commission) || 0,
-            quantity: parseFloat(template.quantity) || 1,
-            initialInvestment: parseFloat(template.initialInvestment) || 0,
-            expectedVolume: parseFloat(template.expectedVolume) || 100
-          });
         } catch (e) {
           console.error('加载模板失败:', e);
         }
       }
     }
-  }, [open]);
+  }, [open, productCostInput, packagingCostInput, domesticShippingInput, exportCostInput, exportCostRateInput, oceanFreightInput, insuranceInput, targetMarginInput, commissionInput, quantityInput, initialInvestmentInput, expectedVolumeInput]);
 
   // 解析所有输入值的对象
   const parsedValues = useMemo(() => ({
@@ -517,54 +457,6 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
   // 左侧输入区域 - 包含建议零售价展示
   const renderLeftInputSection = () => (
     <div className="space-y-6">
-      {/* 建议零售价展示区域 */}
-      <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
-        <h3 className="font-medium text-gray-900 mb-3 flex items-center">
-          <DollarSign className="w-4 h-4 mr-2" />
-          建议零售价 (基于目标利润率 {targetMarginInput.numericValue.toFixed(1)}%)
-        </h3>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div className="text-center">
-            <div className="text-xs text-gray-500 mb-1">EXW价格</div>
-            <div className="text-lg font-bold text-blue-600">
-              {currency} {calculateSuggestedPrice('exw').toFixed(2)}
-            </div>
-            <div className="text-xs text-gray-400">
-              成本: {currency} {calculateBasicCost().toFixed(2)}
-            </div>
-          </div>
-
-          <div className="text-center">
-            <div className="text-xs text-gray-500 mb-1">FOB价格</div>
-            <div className="text-lg font-bold text-green-600">
-              {currency} {calculateSuggestedPrice('fob').toFixed(2)}
-            </div>
-            <div className="text-xs text-gray-400">
-              +出口: {currency} {calculateExportCost().toFixed(2)}
-            </div>
-          </div>
-
-          <div className="text-center">
-            <div className="text-xs text-gray-500 mb-1">CIF价格</div>
-            <div className="text-lg font-bold text-purple-600">
-              {currency} {calculateSuggestedPrice('cif').toFixed(2)}
-            </div>
-            <div className="text-xs text-gray-400">
-              +运保: {currency} {(oceanFreightInput.numericValue + insuranceInput.numericValue).toFixed(2)}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-green-100">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">预期单品利润 (CIF):</span>
-            <span className="font-semibold text-green-600">
-              {currency} {calculateExpectedProfit().toFixed(2)}
-            </span>
-          </div>
-        </div>
-      </div>
       {/* 货币和汇率设置 */}
       <div className="bg-white rounded-lg p-4 shadow-sm border">
         <h3 className="font-medium text-gray-900 mb-3 flex items-center">
@@ -692,33 +584,16 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
                   className="text-right"
                 />
               </div>
-              <div>
-                <label className="text-sm text-gray-600 mb-1 block">
-                  或按比例 (%)
-                  <span className="text-xs text-gray-400 ml-1">(基于基础成本)</span>
-                </label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={exportCostRateInput.displayValue}
-                  onChange={exportCostRateInput.handleChange}
-                  onBlur={exportCostRateInput.handleBlur}
-                  ref={exportCostRateInput.inputRef}
-                  placeholder="5"
-                  className="text-right"
-                />
-              </div>
+              
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              实际出口费用: {currency} {calculatedExportCost.toFixed(2)}
-            </div>
+
           </div>
 
           <div className="pt-3 border-t border-gray-100">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">基础成本</span>
               <span className="font-semibold text-gray-900">
-                {currency} {results.basicCost.toFixed(2)}
+                {currency} {(results.basicCost + results.exportCost).toFixed(2)}
               </span>
             </div>
           </div>
@@ -734,7 +609,7 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-gray-600 mb-1 block">海运费</label>
+              <label className="text-sm text-gray-600 mb-1 block">海/空 运费</label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -772,7 +647,8 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
                 className="text-right"
               />
             </div>
-            <div>
+
+           {/* <div>
               <label className="text-sm text-gray-600 mb-1 block">佣金 (%)</label>
               <Input
                 type="text"
@@ -784,7 +660,8 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
                 placeholder="0"
                 className="text-right"
               />
-            </div>
+            </div> */}
+
           </div>
         </div>
       </div>
@@ -835,147 +712,9 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
     </div>
   );
 
-  // 右侧结果展示 - 全新横向高效设计
+  // 右侧结果展示 - 重构精简版
   const renderRightResultSection = () => (
     <div className="space-y-4">
-      {/* 实时汇率显示 */}
-      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700">实时汇率</span>
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-bold text-orange-600">{exchangeRate.toFixed(4)}</span>
-            <span className="text-sm text-gray-500"> CNY → {currency}</span>
-            <Button size="sm" variant="ghost" onClick={updateRate} disabled={rateLoading}>
-              <RefreshCw className={`w-4 h-4 ${rateLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* 贸易术语对比 - 横向网格布局 */}
-      <div className="bg-white border rounded-lg p-4">
-        <h3 className="font-medium text-gray-900 mb-4 flex items-center">
-          <Target className="w-4 h-4 mr-2" />
-          报价结果对比
-        </h3>
-
-        {/* 表格式横向布局 */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3 font-medium text-gray-700">贸易术语</th>
-                <th className="text-right py-2 px-3 font-medium text-gray-700">（{currency}）建议零售价</th>
-                <th className="text-right py-2 px-3 font-medium text-gray-700">成本</th>
-                <th className="text-right py-2 px-3 font-medium text-gray-700">利润</th>
-                <th className="text-right py-2 px-3 font-medium text-gray-700">利润率</th>
-                <th className="text-right py-2 px-3 font-medium text-gray-700">（RMB）折算人民币</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              <tr className="hover:bg-blue-50 transition-colors">
-                <td className="py-3 px-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">EXW</span>
-                    <span className="font-medium">工厂交货</span>
-                  </div>
-                </td>
-                <td className="py-3 px-3 text-right font-bold text-blue-600">
-                  {results.exw.price.toFixed(2)}
-                </td>
-                <td className="py-3 px-3 text-right">{results.exw.cost.toFixed(2)}</td>
-                <td className="py-3 px-3 text-right text-green-600 font-medium">
-                  {results.exw.profit.toFixed(2)}
-                </td>
-                <td className="py-3 px-3 text-right text-green-600 font-medium">
-                  {results.exw.margin.toFixed(1)}%
-                </td>
-                <td className="py-3 px-3 text-right text-gray-600">
-                  ¥{(results.exw.price * exchangeRate).toFixed(2)}
-                </td>
-              </tr>
-
-              {/* FOB 行 */}
-              <tr className="hover:bg-green-50/50 transition-colors">
-                <td className="py-3 px-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-green-600 text-white px-2 py-1 rounded-md text-xs font-medium">FOB</span>
-                    <span className="text-sm font-medium text-gray-900">装运港船上交货</span>
-                  </div>
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <span className="text-lg font-bold text-green-600">
-                    {results.fob.price.toFixed(2)}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-right text-sm text-gray-600">
-                  {results.fob.cost.toFixed(2)}
-                </td>
-                <td className="py-3 px-4 text-right text-sm text-green-600">
-                  {results.fob.profit.toFixed(2)}
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs font-medium">
-                    {results.fob.margin.toFixed(1)}%
-                  </span>
-                </td>
-                {currency !== 'CNY' && (
-                  <td className="py-3 px-4 text-right text-sm text-gray-600">
-                    ¥{(results.fob.price * exchangeRate).toFixed(2)}
-                  </td>
-                )}
-              </tr>
-
-              {/* CIF 行 */}
-              <tr className="hover:bg-purple-50/50 transition-colors bg-purple-50/30">
-                <td className="py-3 px-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-purple-600 text-white px-2 py-1 rounded-md text-xs font-medium">CIF</span>
-                    <span className="text-sm font-medium text-gray-900">成本保险费加运费</span>
-                  </div>
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <span className="text-lg font-bold text-purple-600">
-                    {results.cif.price.toFixed(2)}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-right text-sm text-gray-600">
-                  {results.cif.cost.toFixed(2)}
-                </td>
-                <td className="py-3 px-4 text-right text-sm text-green-600">
-                  {results.cif.profit.toFixed(2)}
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs font-medium">
-                    {results.cif.margin.toFixed(1)}%
-                  </span>
-                </td>
-                {currency !== 'CNY' && (
-                  <td className="py-3 px-4 text-right text-sm text-gray-600">
-                    ¥{(results.cif.price * exchangeRate).toFixed(2)}
-                  </td>
-                )}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* 佣金显示 */}
-        {costs.commission > 0 && (
-          <div className="bg-orange-50 px-4 py-3 border-t border-orange-100">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-orange-800 font-medium">
-                含佣金 ({costs.commission.toFixed(1)}%)
-              </span>
-              <div className="text-orange-600 space-x-4">
-                <span>EXW: {currency} {results.exw.commission.toFixed(2)}</span>
-                <span>FOB: {currency} {results.fob.commission.toFixed(2)}</span>
-                <span>CIF: {currency} {results.cif.commission.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* 详细成本结构分析表格 */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -983,7 +722,7 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
           <h3 className="font-semibold text-gray-900 flex items-center">
             <ChartBar className="w-4 h-4 mr-2" />
             成本结构分析
-            <span className="ml-2 text-xs text-gray-500">(基于 CIF 价格)</span>
+            <span className="ml-2 text-xs text-gray-500">(基于总成本构成)</span>
           </h3>
         </div>
 
@@ -998,100 +737,208 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {[
-                {
-                  name: '产品成本',
-                  value: costs.productCost,
-                  color: 'bg-blue-500',
-                  textColor: 'text-blue-600'
-                },
-                {
-                  name: '包装费用',
-                  value: costs.packagingCost,
-                  color: 'bg-green-500',
-                  textColor: 'text-green-600'
-                },
-                {
-                  name: '国内运费',
-                  value: costs.domesticShipping,
-                  color: 'bg-yellow-500',
-                  textColor: 'text-yellow-600'
-                },
-                {
-                  name: '出口费用',
-                  value: results.exportCost,
-                  color: 'bg-orange-500',
-                  textColor: 'text-orange-600'
-                },
-                {
-                  name: '海运费',
-                  value: costs.oceanFreight,
-                  color: 'bg-cyan-500',
-                  textColor: 'text-cyan-600'
-                },
-                {
-                  name: '保险费',
-                  value: costs.insurance,
-                  color: 'bg-purple-500',
-                  textColor: 'text-purple-600'
-                }
-              ].map((item, index) => {
-                const percentage = results.cif.price > 0 ? (item.value / results.cif.price * 100) : 0;
-                return (
-                  <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4">
-                      <span className={`text-sm font-medium ${item.textColor}`}>
-                        {item.name}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right text-sm font-medium">
-                      {item.value.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 text-right text-sm text-gray-600">
-                      {percentage.toFixed(1)}%
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="w-full bg-gray-200 rounded-full h-2 max-w-[80px] ml-auto">
-                        <div
-                          className={`h-2 rounded-full ${item.color}`}
-                          style={{ width: `${Math.min(percentage, 100)}%` }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {(() => {
+                // 计算总成本（只包含实际成本项目，不含利润）
+                const totalCosts = costs.productCost + costs.packagingCost + costs.domesticShipping +
+                                 results.exportCost + costs.oceanFreight + costs.insurance;
+
+                const costItems = [
+                  {
+                    name: '产品成本',
+                    value: costs.productCost,
+                    color: 'bg-blue-500',
+                    textColor: 'text-blue-600'
+                  },
+                  {
+                    name: '包装费用',
+                    value: costs.packagingCost,
+                    color: 'bg-green-500',
+                    textColor: 'text-green-600'
+                  },
+                  {
+                    name: '国内运费',
+                    value: costs.domesticShipping,
+                    color: 'bg-yellow-500',
+                    textColor: 'text-yellow-600'
+                  },
+                  {
+                    name: '出口费用',
+                    value: results.exportCost,
+                    color: 'bg-orange-500',
+                    textColor: 'text-orange-600'
+                  },
+                  {
+                    name: '海运费',
+                    value: costs.oceanFreight,
+                    color: 'bg-cyan-500',
+                    textColor: 'text-cyan-600'
+                  },
+                  {
+                    name: '保险费',
+                    value: costs.insurance,
+                    color: 'bg-purple-500',
+                    textColor: 'text-purple-600'
+                  }
+                ];
+
+                return costItems.map((item, index) => {
+                  // 基于总成本计算占比（不包含利润）
+                  const percentage = totalCosts > 0 ? (item.value / totalCosts * 100) : 0;
+                  return (
+                    <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <span className={`text-sm font-medium ${item.textColor}`}>
+                          {item.name}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right text-sm font-medium">
+                        {item.value.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-sm text-gray-600">
+                        {percentage.toFixed(1)}%
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="w-full bg-gray-200 rounded-full h-2 max-w-[80px] ml-auto">
+                          <div
+                            className={`h-2 rounded-full ${item.color}`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
 
               {/* 利润行 */}
-              <tr className="bg-green-50 border-t-2 border-green-200">
+              <tr className="border-t border-gray-200">
                 <td className="py-3 px-4">
-                  <span className="text-sm font-bold text-green-700">总利润</span>
+                  <span className="text-sm font-bold text-green-700">目标利润</span>
                 </td>
                 <td className="py-3 px-4 text-right text-sm font-bold text-green-600">
-                  {results.cif.profit.toFixed(2)}
+                  {(() => {
+                    const totalCosts = costs.productCost + costs.packagingCost ;
+                    return (totalCosts * (targetMarginInput.numericValue / 100)).toFixed(2);
+                  })()}
+                </td>
+                <td className="py-3 px-4 text-right text-sm text-gray-600">
+                  -
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs font-bold">
-                    {results.cif.margin.toFixed(1)}%
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <div className="w-full bg-gray-200 rounded-full h-2 max-w-[80px] ml-auto">
-                    <div
-                      className="h-2 rounded-full bg-green-500"
-                      style={{ width: `${Math.min(results.cif.margin, 100)}%` }}
-                    />
-                  </div>
+                  -
                 </td>
               </tr>
+
+
+              {/* 总成本行 */}
+              <tr className="border-t border-gray-200">
+                <td className="py-3 px-4">
+                  <span className="text-sm font-bold text-orange-700">总成本</span>
+                </td>
+                <td className="py-3 px-4 text-right text-sm font-bold text-orange-600">
+                  {(() => {
+                    const totalCosts = costs.productCost + costs.packagingCost + costs.domesticShipping +
+                                     results.exportCost + costs.oceanFreight + costs.insurance;
+                    return totalCosts.toFixed(2);
+                  })()}
+                </td>
+              </tr>
+
+              
             </tbody>
           </table>
+        </div>
+
+        {/* 建议零售价和人民币折算 - 新增部分 */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-t border-gray-200 p-4 mt-6">
+          <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+           
+            建议零售价对比
+          </h4>
+
+          <div className="grid grid-cols-3 gap-4">
+            {(() => {
+              // 计算各成本项目
+              const productCost = productCostInput.numericValue;
+              const packagingCost = packagingCostInput.numericValue;
+              const domesticShipping = domesticShippingInput.numericValue;
+              const exportCost = results.exportCost;
+              const oceanFreight = oceanFreightInput.numericValue;
+              const insurance = insuranceInput.numericValue;
+              const targetProfit = (productCost + packagingCost) * (targetMarginInput.numericValue / 100);
+
+              // 新算法计算建议零售价
+              const exwSuggestedPrice = productCost + packagingCost + targetProfit;
+              const fobSuggestedPrice = exwSuggestedPrice + domesticShipping + exportCost;
+              const cifSuggestedPrice = fobSuggestedPrice + oceanFreight + insurance;
+
+              return (
+                <>
+                  {/* EXW 建议零售价 */}
+                  <div className="bg-white rounded-lg p-3 border border-blue-200">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 mb-1">EXW 建议零售价</div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {currency} {exwSuggestedPrice.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        (RMB) ¥{(exwSuggestedPrice * exchangeRate).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        利润: {currency} {targetProfit.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FOB 建议零售价 */}
+                  <div className="bg-white rounded-lg p-3 border border-green-200">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 mb-1">FOB 建议零售价</div>
+                      <div className="text-lg font-bold text-green-600">
+                        {currency} {fobSuggestedPrice.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        (RMB) ¥{(fobSuggestedPrice * exchangeRate).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        利润: {currency} {targetProfit.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CIF 建议零售价 - 突出显示 */}
+                  <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg p-3 border-2 border-purple-300">
+                    <div className="text-center">
+                      <div className="text-xs text-purple-700 mb-1 font-medium">CIF 建议零售价</div>
+                      <div className="text-lg font-bold text-purple-700">
+                        {currency} {cifSuggestedPrice.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-purple-600 mt-1 font-medium">
+                        (RMB) ¥{(cifSuggestedPrice * exchangeRate).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-purple-500 mt-1 font-medium">
+                        利润: {currency} {targetProfit.toFixed(2)} ⭐
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* 汇率说明 */}
+          <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
+            <span>汇率: 1 {currency} = {exchangeRate.toFixed(4)} CNY</span>
+            <span className="text-xs">
+              {lastUpdate} {isCached && <span className="text-orange-600">(缓存)</span>}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* ROI 投资分析结果 */}
       {costs.initialInvestment > 0 && (
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 shadow-sm">
+        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-4 shadow-sm mt-6">
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
             <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
             ROI 投资回收分析
@@ -1107,16 +954,6 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
 
             <div className="bg-white rounded-lg p-3 border">
               <div className="text-xs text-gray-500 mb-1">投资回收周期</div>
-              <div className="text-lg font-bold text-indigo-600">
-                {results.cif.profit > 0
-                  ? Math.ceil(costs.initialInvestment / (results.cif.profit * parsedValues.quantity)).toLocaleString()
-                  : '∞'
-                } 笔订单
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="text-xs text-gray-500 mb-1">ROI 回报率</div>
               <div className="text-lg font-bold text-purple-600">
                 {costs.initialInvestment > 0
                   ? ((results.cif.profit * parsedValues.quantity / costs.initialInvestment) * 100).toFixed(1)
@@ -1125,7 +962,20 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
               </div>
               <div className="text-xs text-gray-400">每笔订单</div>
             </div>
+
+            <div className="bg-white rounded-lg p-3 border">
+              <div className="text-xs text-gray-500 mb-1">ROI 回报率</div>
+              <div className="text-lg font-bold text-indigo-600">
+                {results.cif.profit > 0
+                  ? Math.ceil(costs.initialInvestment / (results.cif.profit * parsedValues.quantity)).toLocaleString()
+                  : '∞'
+                } 笔订单
+              </div>
+
+
+            </div>
           </div>
+
 
           {costs.expectedVolume > 0 && (
             <div className="mt-4 pt-4 border-t border-indigo-200">
