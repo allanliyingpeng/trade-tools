@@ -1,3 +1,5 @@
+import { NextResponse } from 'next/server';
+
 // 全局缓存存储 (服务端内存缓存)
 const rateCache = new Map<string, {
   rate: number;

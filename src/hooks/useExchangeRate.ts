@@ -51,6 +51,11 @@ export const useExchangeRate = (fromCurrency: string, toCurrency: string = 'CNY'
       const response = await fetch(
         `/api/exchange-rate?from=${fromCurrency}&to=${toCurrency}`
       );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.success) {
