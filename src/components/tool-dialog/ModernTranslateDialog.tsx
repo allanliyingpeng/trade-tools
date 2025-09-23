@@ -106,36 +106,101 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
   }
 
   const translateText = useCallback(async () => {
-    if (!inputText.trim() || isLoading) return
+    const textToTranslate = inputText.trim()
+
+    // 验证输入
+    if (!textToTranslate) {
+      setError('请输入要翻译的文本')
+      return
+    }
+
+    if (textToTranslate.length > 5000) {
+      setError('文本长度不能超过5000字符')
+      return
+    }
+
+    if (sourceLang === targetLang) {
+      setError('源语言和目标语言不能相同')
+      return
+    }
+
+    if (isLoading) return
 
     setIsLoading(true)
     setError('')
 
     try {
+      // 增加请求超时控制
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20000) // 20秒超时
+
       const response = await fetch('/api/translate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: inputText,
+          text: textToTranslate,
           from: sourceLang,
           to: targetLang,
         }),
+        signal: controller.signal
       })
 
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
-        throw new Error('翻译服务暂时不可用')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || '翻译服务暂时不可用')
       }
 
       const data = await response.json()
+      const translationMethod = response.headers.get('X-Translation-Method')
+
+      if (!data.translatedText) {
+        throw new Error('翻译结果为空，请重试')
+      }
+
       setResult(data.translatedText)
 
+      // 如果使用了备用方案，显示提示
+      if (translationMethod === 'Fallback Dictionary') {
+        setError('此翻译结果来自基础词典，可能不够准确')
+      }
+
       // 保存到历史记录
-      saveToHistory(inputText, data.translatedText, sourceLang, targetLang)
+      saveToHistory(textToTranslate, data.translatedText, sourceLang, targetLang)
     } catch (error) {
       console.error('Translation failed:', error)
-      setError(error instanceof Error ? error.message : '翻译失败，请重试')
+
+      // 更详细的错误处理
+      let errorMessage = '翻译失败，请重试'
+
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = '翻译请求超时，请重试'
+        } else if (error.message.includes('网络')) {
+          errorMessage = '网络连接失败，请检查网络后重试'
+        } else if (error.message.includes('API配额') || error.message.includes('quota')) {
+          errorMessage = 'API配额已用完，请稍后重试'
+        } else if (error.message.includes('繁忙') || error.message.includes('overloaded')) {
+          errorMessage = '翻译服务繁忙，正在重试...'
+        } else if (error.message.includes('不支持的语言')) {
+          errorMessage = '不支持此语言对的翻译'
+        } else if (error.message.includes('文本内容不能为空')) {
+          errorMessage = '请输入要翻译的文本'
+        } else if (error.message.includes('配置错误')) {
+          errorMessage = 'API配置错误，请联系管理员'
+        } else if (error.message.includes('超时')) {
+          errorMessage = '翻译超时，请重试'
+        } else if (error.message.includes('需要人工翻译')) {
+          errorMessage = '该文本较为复杂，建议使用专业翻译服务'
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -200,6 +265,24 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
+        `
+      }} />
       {/* 背景遮罩 */}
       <div
         className="absolute inset-0 bg-black/20"
@@ -207,9 +290,9 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
       />
 
       {/* 弹窗主体 */}
-      <div className="relative w-[800px] h-[500px] bg-white rounded-xl shadow-lg flex flex-col overflow-hidden">
+      <div className="relative w-[900px] max-h-[90vh] bg-white rounded-xl shadow-lg flex flex-col overflow-hidden">
         {/* 头部区域 */}
-        <div className="h-15 px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           {/* 左侧标题 */}
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
@@ -289,9 +372,9 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
         </div>
 
         {/* 主要翻译区域 */}
-        <div className="flex-1 p-6 grid grid-cols-2 gap-6 overflow-hidden">
+        <div className="flex-1 p-6 grid grid-cols-2 gap-6 min-h-0">
           {/* 左侧 - 输入区域 */}
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col min-h-0">
             {/* 区域标题 */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium text-gray-700">原文</span>
@@ -306,7 +389,7 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
 • 外贸术语翻译
 • 商务邮件翻译
 • 合同条款翻译`}
-              className="flex-1 resize-none border border-gray-200 rounded-lg p-4
+              className="flex-1 min-h-[200px] max-h-[300px] resize-none border border-gray-200 rounded-lg p-4
                          focus:border-blue-500 focus:ring-2 focus:ring-blue-100
                          text-sm leading-relaxed transition-colors"
               value={inputText}
@@ -355,7 +438,7 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
           </div>
 
           {/* 右侧 - 结果区域 */}
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col min-h-0">
             {/* 区域标题 */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium text-gray-700">译文</span>
@@ -371,12 +454,12 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
             </div>
 
             {/* 翻译结果显示 */}
-            <div className="flex-1 border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="flex-1 min-h-[200px] max-h-[300px] border border-gray-200 rounded-lg p-4 bg-gray-50 overflow-y-auto custom-scrollbar">
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <Loader2 className="w-6 h-6 mx-auto mb-2 text-blue-600 animate-spin" />
-                    <p className="text-sm text-gray-500">Gemini正在翻译中...</p>
+                    <p className="text-sm text-gray-500">正在翻译中...</p>
                   </div>
                 </div>
               ) : error ? (
@@ -393,7 +476,7 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
                   </div>
                 </div>
               ) : result ? (
-                <div className="text-sm leading-relaxed text-gray-900 h-full overflow-y-auto custom-scrollbar">
+                <div className="text-sm leading-relaxed text-gray-900 whitespace-pre-wrap break-words max-h-full overflow-y-auto">
                   {result}
                 </div>
               ) : (
@@ -413,7 +496,7 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
               <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center space-x-3">
                   <span className="text-xs text-gray-500">
-                    由 Gemini 翻译
+                    欢迎使用 TradeHelper
                   </span>
                 </div>
 

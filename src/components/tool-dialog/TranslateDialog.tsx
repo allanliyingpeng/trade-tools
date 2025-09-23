@@ -305,6 +305,7 @@ export default function TranslateDialog({ feature }: TranslateDialogProps) {
         )}
 
         <div className="flex justify-center pt-4">
+          
           <Button
             onClick={handleTranslate}
             disabled={!sourceText.trim() || !canExecute || isLoading}

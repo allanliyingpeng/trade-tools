@@ -3,8 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Calculator, RefreshCw, Download, Copy, RotateCcw, Save,
-  Package, Truck, Currency, ChartBar, X, TrendingUp,
-  DollarSign
+  Package, Truck, Currency, ChartBar, X, TrendingUp
 } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -130,7 +129,6 @@ export default function QuotationCalculatorDialog({
   const oceanFreightInput = useStableInput('0');
   const insuranceInput = useStableInput('0');
   const targetMarginInput = useStableInput('0');
-  const commissionInput = useStableInput('0');
   const quantityInput = useStableInput('1');
   const initialInvestmentInput = useStableInput('0');
   const expectedVolumeInput = useStableInput('100');
@@ -184,15 +182,10 @@ export default function QuotationCalculatorDialog({
     const cifProfit = cifPrice - cifCost;
     const cifMargin = cifPrice > 0 ? (cifProfit / cifPrice) * 100 : 0;
 
-    // 5. 佣金计算
-    const exwCommission = exwPrice * (commissionInput.numericValue / 100);
-    const fobCommission = fobPrice * (commissionInput.numericValue / 100);
-    const cifCommission = cifPrice * (commissionInput.numericValue / 100);
-
-    // 6. 最终价格（包含佣金）
-    const finalExwPrice = exwPrice + exwCommission;
-    const finalFobPrice = fobPrice + fobCommission;
-    const finalCifPrice = cifPrice + cifCommission;
+    // 5. 最终价格
+    const finalExwPrice = exwPrice;
+    const finalFobPrice = fobPrice;
+    const finalCifPrice = cifPrice;
 
     // 7. ROI计算
     const unitProfit = cifProfit;
@@ -210,14 +203,14 @@ export default function QuotationCalculatorDialog({
         cost: exwBaseCost,
         profit: exwProfit,
         margin: exwMargin,
-        commission: exwCommission
+        commission: 0
       },
       fob: {
         price: finalFobPrice,
         cost: fobCost,
         profit: fobProfit,
         margin: fobMargin,
-        commission: fobCommission,
+        commission: 0,
         exportCost: exportCost
       },
       cif: {
@@ -225,7 +218,7 @@ export default function QuotationCalculatorDialog({
         cost: cifCost,
         profit: cifProfit,
         margin: cifMargin,
-        commission: cifCommission,
+        commission: 0,
         freight: oceanFreightInput.numericValue,
         insurance: insuranceInput.numericValue
       },
@@ -239,7 +232,7 @@ export default function QuotationCalculatorDialog({
         paybackPeriod
       }
     };
-  }, [calculateBasicCost, calculateExportCost, productCostInput.numericValue, packagingCostInput.numericValue, domesticShippingInput.numericValue, targetMarginInput.numericValue, oceanFreightInput.numericValue, insuranceInput.numericValue, commissionInput.numericValue, expectedVolumeInput.numericValue, initialInvestmentInput.numericValue, quantityInput.numericValue]);
+  }, [calculateBasicCost, calculateExportCost, productCostInput.numericValue, packagingCostInput.numericValue, domesticShippingInput.numericValue, targetMarginInput.numericValue, oceanFreightInput.numericValue, insuranceInput.numericValue, expectedVolumeInput.numericValue, initialInvestmentInput.numericValue, quantityInput.numericValue]);
 
   // 防抖计算结果 - 避免频繁重新渲染
   const [results, setResults] = useState(() => calculateQuotes());
@@ -272,11 +265,10 @@ export default function QuotationCalculatorDialog({
     oceanFreightInput.setValue('0');
     insuranceInput.setValue('0');
     targetMarginInput.setValue('20');
-    commissionInput.setValue('0');
     quantityInput.setValue('1');
     initialInvestmentInput.setValue('0');
     expectedVolumeInput.setValue('100');
-  }, [productCostInput, packagingCostInput, domesticShippingInput, exportCostInput, exportCostRateInput, oceanFreightInput, insuranceInput, targetMarginInput, commissionInput, quantityInput, initialInvestmentInput, expectedVolumeInput]);
+  }, [productCostInput, packagingCostInput, domesticShippingInput, exportCostInput, exportCostRateInput, oceanFreightInput, insuranceInput, targetMarginInput, quantityInput, initialInvestmentInput, expectedVolumeInput]);
 
   // 保存模板
   const saveTemplate = () => {
@@ -290,7 +282,6 @@ export default function QuotationCalculatorDialog({
         oceanFreight: oceanFreightInput.displayValue,
         insurance: insuranceInput.displayValue,
         targetMargin: targetMarginInput.displayValue,
-        commission: commissionInput.displayValue,
         quantity: quantityInput.displayValue,
         initialInvestment: initialInvestmentInput.displayValue,
         expectedVolume: expectedVolumeInput.displayValue,
@@ -317,7 +308,6 @@ export default function QuotationCalculatorDialog({
           oceanFreightInput.setValue(template.oceanFreight || '0');
           insuranceInput.setValue(template.insurance || '0');
           targetMarginInput.setValue(template.targetMargin || '20');
-          commissionInput.setValue(template.commission || '0');
           quantityInput.setValue(template.quantity || '1');
           initialInvestmentInput.setValue(template.initialInvestment || '0');
           expectedVolumeInput.setValue(template.expectedVolume || '100');
@@ -329,7 +319,7 @@ export default function QuotationCalculatorDialog({
         }
       }
     }
-  }, [open, productCostInput, packagingCostInput, domesticShippingInput, exportCostInput, exportCostRateInput, oceanFreightInput, insuranceInput, targetMarginInput, commissionInput, quantityInput, initialInvestmentInput, expectedVolumeInput]);
+  }, [open, productCostInput, packagingCostInput, domesticShippingInput, exportCostInput, exportCostRateInput, oceanFreightInput, insuranceInput, targetMarginInput, quantityInput, initialInvestmentInput, expectedVolumeInput]);
 
   // 解析所有输入值的对象
   const parsedValues = useMemo(() => ({
@@ -339,7 +329,6 @@ export default function QuotationCalculatorDialog({
     oceanFreight: oceanFreightInput.numericValue,
     insurance: insuranceInput.numericValue,
     targetMargin: targetMarginInput.numericValue,
-    commission: commissionInput.numericValue,
     quantity: quantityInput.numericValue,
     initialInvestment: initialInvestmentInput.numericValue,
     expectedVolume: expectedVolumeInput.numericValue
@@ -350,8 +339,7 @@ export default function QuotationCalculatorDialog({
     oceanFreightInput.numericValue,
     insuranceInput.numericValue,
     targetMarginInput.numericValue,
-    commissionInput.numericValue,
-    quantityInput.numericValue,
+        quantityInput.numericValue,
     initialInvestmentInput.numericValue,
     expectedVolumeInput.numericValue
   ]);
@@ -370,7 +358,6 @@ export default function QuotationCalculatorDialog({
     oceanFreight: parsedValues.oceanFreight,
     insurance: parsedValues.insurance,
     targetMargin: parsedValues.targetMargin,
-    commission: parsedValues.commission,
     quantity: parsedValues.quantity,
     initialInvestment: parsedValues.initialInvestment,
     expectedVolume: parsedValues.expectedVolume
@@ -434,7 +421,6 @@ export default function QuotationCalculatorDialog({
 │ 利润: ${currency} ${results.cif.profit.toFixed(2)} (${results.cif.margin.toFixed(1)}%)     │
 └─────────────────────────────────────────────┘
 
-${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
 目标利润率: ${costs.targetMargin}%
 生成时间: ${new Date().toLocaleString('zh-CN')}
     `.trim();
@@ -648,19 +634,6 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
               />
             </div>
 
-           {/* <div>
-              <label className="text-sm text-gray-600 mb-1 block">佣金 (%)</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={commissionInput.displayValue}
-                onChange={commissionInput.handleChange}
-                onBlur={commissionInput.handleBlur}
-                ref={commissionInput.inputRef}
-                placeholder="0"
-                className="text-right"
-              />
-            </div> */}
 
           </div>
         </div>
@@ -853,7 +826,7 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-t border-gray-200 p-4 mt-6">
           <h4 className="font-medium text-gray-900 mb-3 flex items-center">
            
-            建议零售价对比
+            模式价格对比
           </h4>
 
           <div className="grid grid-cols-3 gap-4">
@@ -877,7 +850,7 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
                   {/* EXW 建议零售价 */}
                   <div className="bg-white rounded-lg p-3 border border-blue-200">
                     <div className="text-center">
-                      <div className="text-xs text-gray-500 mb-1">EXW 建议零售价</div>
+                      <div className="text-xs text-gray-500 mb-1">EXW 价格</div>
                       <div className="text-lg font-bold text-blue-600">
                         {currency} {exwSuggestedPrice.toFixed(2)}
                       </div>
@@ -893,7 +866,7 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
                   {/* FOB 建议零售价 */}
                   <div className="bg-white rounded-lg p-3 border border-green-200">
                     <div className="text-center">
-                      <div className="text-xs text-gray-500 mb-1">FOB 建议零售价</div>
+                      <div className="text-xs text-gray-500 mb-1">FOB 价格</div>
                       <div className="text-lg font-bold text-green-600">
                         {currency} {fobSuggestedPrice.toFixed(2)}
                       </div>
@@ -909,7 +882,7 @@ ${costs.commission > 0 ? `\n佣金设置: ${costs.commission}%` : ''}
                   {/* CIF 建议零售价 - 突出显示 */}
                   <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg p-3 border-2 border-purple-300">
                     <div className="text-center">
-                      <div className="text-xs text-purple-700 mb-1 font-medium">CIF 建议零售价</div>
+                      <div className="text-xs text-purple-700 mb-1 font-medium">CIF 价格</div>
                       <div className="text-lg font-bold text-purple-700">
                         {currency} {cifSuggestedPrice.toFixed(2)}
                       </div>
