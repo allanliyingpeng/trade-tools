@@ -1,120 +1,101 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface ExchangeRateData {
-  rate: number;
-  loading: boolean;
+  success: boolean;
+  fromCurrency: string;
+  toCurrency: string;
+  exchangeRate: number;
+  convertedAmount: number;
+  originalAmount: number;
   lastUpdate: string;
-  error: string | null;
-  isCached: boolean;
-  updateRate: () => void;
+  nextUpdate?: string;
+  cached: boolean;
+  fresh: boolean;
+  fallback?: boolean;
+  cacheAge?: number;
+  apiCallCount?: number;
+  nextRefresh?: string;
+  message: string;
+  error?: string;
 }
 
-export const useExchangeRate = (fromCurrency: string, toCurrency: string = 'CNY'): ExchangeRateData => {
-  const [rate, setRate] = useState<number>(7.2);
+interface UseExchangeRateReturn {
+  data: ExchangeRateData | null;
+  loading: boolean;
+  error: string | null;
+  refreshRate: () => void;
+  isCached: boolean;
+  isFresh: boolean;
+  isFallback: boolean;
+  cacheAge: number;
+  apiCallCount: number;
+  nextRefresh?: string;
+  message: string;
+}
+
+export const useExchangeRate = (from: string, to: string, amount: string): UseExchangeRateReturn => {
+  const [data, setData] = useState<ExchangeRateData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [lastUpdate, setLastUpdate] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [isCached, setIsCached] = useState<boolean>(false);
+  const [lastFetch, setLastFetch] = useState<number>(0);
 
-  const getCacheKey = (from: string, to: string) => `exchange_rate_${from}_${to}`;
-  const CLIENT_CACHE_DURATION = 10 * 60 * 1000; // 客户端缓存10分钟
+  const fetchRate = useCallback(async (forceRefresh = false) => {
+    if (!from || !to || !amount) return;
 
-  const updateRate = async (forceUpdate = false) => {
-    const cacheKey = getCacheKey(fromCurrency, toCurrency);
+    // 防抖：避免重复请求（1秒内的重复请求直接忽略）
     const now = Date.now();
-
-    // 检查客户端缓存
-    if (!forceUpdate && typeof window !== 'undefined') {
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const cachedData = JSON.parse(cached);
-          if (now - cachedData.timestamp < CLIENT_CACHE_DURATION) {
-            console.log(`客户端缓存命中: ${fromCurrency}->${toCurrency}`);
-            setRate(cachedData.rate);
-            setLastUpdate(cachedData.lastUpdate);
-            setIsCached(true);
-            setError(null);
-            return; // 使用客户端缓存，无需API调用
-          }
-        } catch (e) {
-          localStorage.removeItem(cacheKey);
-        }
-      }
+    if (!forceRefresh && now - lastFetch < 1000) {
+      return;
     }
 
     setLoading(true);
     setError(null);
+    setLastFetch(now);
 
     try {
-      console.log(`请求汇率API: ${fromCurrency}->${toCurrency}`);
-      const response = await fetch(
-        `/api/exchange-rate?from=${fromCurrency}&to=${toCurrency}`
-      );
+      const url = `/api/exchange-rate?from=${from}&to=${to}&amount=${amount}${forceRefresh ? '&fresh=true' : ''}`;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      console.log(`🔍 前端请求汇率: ${from}→${to}, 强制刷新: ${forceRefresh}`);
 
-      const data = await response.json();
+      const response = await fetch(url);
+      const result = await response.json();
 
-      if (data.success) {
-        setRate(data.rate);
-        const updateTime = data.lastUpdate ? new Date(data.lastUpdate).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN');
-        setLastUpdate(updateTime);
-        setIsCached(data.cached || false);
-
-        // 更新客户端缓存
-        if (typeof window !== 'undefined') {
-          const cacheData = {
-            rate: data.rate,
-            lastUpdate: updateTime,
-            timestamp: now
-          };
-          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        }
-
+      if (result.success) {
+        setData(result);
+        console.log(`✅ 前端获取成功: ${from}→${to}, 缓存: ${result.cached}, 新鲜: ${result.fresh}`);
       } else {
-        throw new Error(data.error);
+        throw new Error(result.error);
       }
     } catch (err: any) {
-      setError(err.message || '汇率更新失败');
-      console.error('汇率更新错误:', err);
-
-      // 尝试使用过期的客户端缓存
-      if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          try {
-            const cachedData = JSON.parse(cached);
-            setRate(cachedData.rate);
-            setLastUpdate(cachedData.lastUpdate + ' (缓存)');
-            setIsCached(true);
-            setError('网络错误，使用缓存数据');
-          } catch (e) {
-            // 缓存也无效
-          }
-        }
-      }
+      setError(err.message);
+      console.error('❌ 前端请求失败:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [from, to, amount, lastFetch]);
 
-  // 组件挂载时获取汇率（可能使用缓存）
+  // 组件挂载时获取数据
   useEffect(() => {
-    updateRate();
-  }, [fromCurrency, toCurrency]);
+    fetchRate();
+  }, [from, to, amount]); // 移除 fetchRate 依赖，避免循环
 
-  // 手动强制更新
-  const forceUpdate = () => updateRate(true);
+  // 手动刷新（强制获取最新数据）
+  const refreshRate = useCallback(() => {
+    fetchRate(true);
+  }, [fetchRate]);
 
   return {
-    rate,
+    data,
     loading,
-    lastUpdate,
     error,
-    isCached,
-    updateRate: forceUpdate
+    refreshRate,
+    // 缓存状态指示器
+    isCached: data?.cached || false,
+    isFresh: data?.fresh || false,
+    isFallback: data?.fallback || false,
+    cacheAge: data?.cacheAge || 0,
+    apiCallCount: data?.apiCallCount || 0,
+    nextRefresh: data?.nextRefresh,
+    message: data?.message || ''
   };
 };

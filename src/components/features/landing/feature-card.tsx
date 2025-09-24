@@ -16,7 +16,7 @@ const ModernTranslateDialog = dynamic(() => import('@/components/tool-dialog/Mod
   loading: () => <div className="p-4 text-center">加载中...</div>
 })
 
-const CurrencyDialog = dynamic(() => import('@/components/tool-dialog/CurrencyDialog'), {
+const CurrencyExchangeDialog = dynamic(() => import('@/components/tool-dialog/CurrencyExchangeDialog'), {
   loading: () => <div className="p-4 text-center">加载中...</div>
 })
 
@@ -43,6 +43,7 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
   const [modernTermOpen, setModernTermOpen] = useState(false)
   const [modernTranslateOpen, setModernTranslateOpen] = useState(false)
   const [quotationCalculatorOpen, setQuotationCalculatorOpen] = useState(false)
+  const [currencyExchangeOpen, setCurrencyExchangeOpen] = useState(false)
   const Icon = feature.icon
 
   const handleClick = () => {
@@ -67,6 +68,11 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
         setQuotationCalculatorOpen(true)
         return
       }
+      if (feature.dialogType === 'currency') {
+        // 对于汇率功能，直接渲染 CurrencyExchangeDialog
+        setCurrencyExchangeOpen(true)
+        return
+      }
       setDialogOpen(true)
       return
     }
@@ -81,7 +87,7 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
       case 'translate':
         return null // ModernTranslateDialog 管理自己的显示状态
       case 'currency':
-        return <CurrencyDialog feature={feature} />
+        return null // CurrencyExchangeDialog 管理自己的显示状态
       case 'quote':
         return null // QuotationCalculatorDialog 管理自己的显示状态
       case 'term':
@@ -168,6 +174,14 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
           <QuotationCalculatorDialog
             open={quotationCalculatorOpen}
             onOpenChange={setQuotationCalculatorOpen}
+          />
+        </>
+      ) : feature.dialogType === 'currency' ? (
+        <>
+          {cardContent}
+          <CurrencyExchangeDialog
+            open={currencyExchangeOpen}
+            onOpenChange={setCurrencyExchangeOpen}
           />
         </>
       ) : (

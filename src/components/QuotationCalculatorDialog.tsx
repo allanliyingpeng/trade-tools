@@ -10,6 +10,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useExchangeRate } from '../hooks/useExchangeRate';
+import { CacheStatusIndicator } from './ui/cache-status-indicator';
 
 
 interface QuoteResults {
@@ -113,12 +114,11 @@ export default function QuotationCalculatorDialog({
 }: QuotationCalculatorDialogProps) {
   const [currency, setCurrency] = useState('USD');
   const {
-    rate: exchangeRate,
+    data: rateData,
     loading: rateLoading,
-    lastUpdate,
-    isCached,
-    updateRate
-  } = useExchangeRate(currency, 'CNY');
+    error: rateError,
+    refreshRate
+  } = useExchangeRate(currency, 'CNY', '1');
 
   // 使用专业稳定输入组件
   const productCostInput = useStableInput('0');
@@ -367,7 +367,7 @@ export default function QuotationCalculatorDialog({
   const exportQuote = () => {
     const quoteData = {
       currency,
-      exchangeRate,
+      exchangeRate: rateData?.exchangeRate || 1,
       costs,
       results,
       timestamp: new Date().toLocaleString('zh-CN')
@@ -389,36 +389,36 @@ export default function QuotationCalculatorDialog({
 外贸报价单 - 专业版
 ====================
 货币: ${currency}
-汇率: ${exchangeRate.toFixed(4)} CNY (更新: ${lastUpdate})
+汇率: ${(rateData?.exchangeRate || 1).toFixed(4)} CNY (更新: ${rateData?.lastUpdate || '未知'})
 
 成本分析:
 - 产品成本: ${currency} ${costs.productCost.toFixed(2)}
 - 包装费: ${currency} ${costs.packagingCost.toFixed(2)}
 - 国内运费: ${currency} ${costs.domesticShipping.toFixed(2)}
-- 基础成本小计: ${currency} ${results.basicCost.toFixed(2)}
+- 基础成本小计: ${currency} ${(results.basicCost || 0).toFixed(2)}
 
 国际费用:
-- 出口费用: ${currency} ${results.exportCost.toFixed(2)} (5%)
+- 出口费用: ${currency} ${(results.exportCost || 0).toFixed(2)} (5%)
 - 海运费: ${currency} ${costs.oceanFreight.toFixed(2)}
 - 保险费: ${currency} ${costs.insurance.toFixed(2)}
 
 报价结果:
 ┌─────────────────────────────────────────────┐
 │ EXW (工厂交货)                              │
-│ 价格: ${currency} ${results.exw.price.toFixed(2)} ${currency !== 'CNY' ? `(¥${(results.exw.price * exchangeRate).toFixed(2)})` : ''}│
-│ 利润: ${currency} ${results.exw.profit.toFixed(2)} (${results.exw.margin.toFixed(1)}%)     │
+│ 价格: ${currency} ${(results.exw?.price || 0).toFixed(2)} ${currency !== 'CNY' ? `(¥${((results.exw?.price || 0) * (rateData?.exchangeRate || 1)).toFixed(2)})` : ''}│
+│ 利润: ${currency} ${(results.exw?.profit || 0).toFixed(2)} (${(results.exw?.margin || 0).toFixed(1)}%)     │
 └─────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────┐
 │ FOB (装运港船上交货)                        │
-│ 价格: ${currency} ${results.fob.price.toFixed(2)} ${currency !== 'CNY' ? `(¥${(results.fob.price * exchangeRate).toFixed(2)})` : ''}│
-│ 利润: ${currency} ${results.fob.profit.toFixed(2)} (${results.fob.margin.toFixed(1)}%)     │
+│ 价格: ${currency} ${(results.fob?.price || 0).toFixed(2)} ${currency !== 'CNY' ? `(¥${((results.fob?.price || 0) * (rateData?.exchangeRate || 1)).toFixed(2)})` : ''}│
+│ 利润: ${currency} ${(results.fob?.profit || 0).toFixed(2)} (${(results.fob?.margin || 0).toFixed(1)}%)     │
 └─────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────┐
 │ CIF (成本保险费加运费)                      │
-│ 价格: ${currency} ${results.cif.price.toFixed(2)} ${currency !== 'CNY' ? `(¥${(results.cif.price * exchangeRate).toFixed(2)})` : ''}│
-│ 利润: ${currency} ${results.cif.profit.toFixed(2)} (${results.cif.margin.toFixed(1)}%)     │
+│ 价格: ${currency} ${(results.cif?.price || 0).toFixed(2)} ${currency !== 'CNY' ? `(¥${((results.cif?.price || 0) * (rateData?.exchangeRate || 1)).toFixed(2)})` : ''}│
+│ 利润: ${currency} ${(results.cif?.profit || 0).toFixed(2)} (${(results.cif?.margin || 0).toFixed(1)}%)     │
 └─────────────────────────────────────────────┘
 
 目标利润率: ${costs.targetMargin}%
@@ -469,24 +469,34 @@ export default function QuotationCalculatorDialog({
             <label className="text-sm font-medium text-gray-700 mb-1 block">汇率到CNY</label>
             <div className="flex items-center space-x-2">
               <Input
-                value={rateLoading ? '更新中...' : exchangeRate.toFixed(4)}
+                value={rateLoading ? '更新中...' : (rateData?.exchangeRate || 1).toFixed(4)}
                 readOnly
-                className={`bg-gray-50 ${isCached ? 'border-orange-200' : 'border-gray-200'}`}
+                className="bg-gray-50"
               />
-              <Button size="sm" variant="outline" onClick={updateRate} disabled={rateLoading}>
+              <Button size="sm" variant="outline" onClick={refreshRate} disabled={rateLoading}>
                 <RefreshCw className={`w-4 h-4 ${rateLoading ? 'animate-spin' : ''}`} />
               </Button>
             </div>
-            {lastUpdate && (
-              <div className="flex items-center space-x-1 mt-1">
-                <span className="text-xs text-gray-500">{lastUpdate}</span>
-                {isCached && (
-                  <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">缓存</span>
-                )}
-              </div>
-            )}
           </div>
         </div>
+
+        {/* 缓存状态指示器 */}
+        {rateData && (
+          <div className="mt-3">
+            <CacheStatusIndicator
+              isCached={rateData.cached}
+              isFresh={rateData.fresh}
+              isFallback={rateData.fallback}
+              cacheAge={rateData.cacheAge}
+              apiCallCount={rateData.apiCallCount}
+              nextRefresh={rateData.nextRefresh}
+              message={rateData.message}
+              loading={rateLoading}
+              onRefresh={refreshRate}
+              className="text-xs"
+            />
+          </div>
+        )}
       </div>
 
       {/* 产品成本 */}
@@ -579,7 +589,7 @@ export default function QuotationCalculatorDialog({
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">基础成本</span>
               <span className="font-semibold text-gray-900">
-                {currency} {(results.basicCost + results.exportCost).toFixed(2)}
+                {currency} {((results.basicCost || 0) + (results.exportCost || 0)).toFixed(2)}
               </span>
             </div>
           </div>
@@ -736,7 +746,7 @@ export default function QuotationCalculatorDialog({
                   },
                   {
                     name: '出口费用',
-                    value: results.exportCost,
+                    value: results.exportCost || 0,
                     color: 'bg-orange-500',
                     textColor: 'text-orange-600'
                   },
@@ -835,7 +845,7 @@ export default function QuotationCalculatorDialog({
               const productCost = productCostInput.numericValue;
               const packagingCost = packagingCostInput.numericValue;
               const domesticShipping = domesticShippingInput.numericValue;
-              const exportCost = results.exportCost;
+              const exportCost = results.exportCost || 0;
               const oceanFreight = oceanFreightInput.numericValue;
               const insurance = insuranceInput.numericValue;
               const targetProfit = (productCost + packagingCost) * (targetMarginInput.numericValue / 100);
@@ -855,7 +865,7 @@ export default function QuotationCalculatorDialog({
                         {currency} {exwSuggestedPrice.toFixed(2)}
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
-                        (RMB) ¥{(exwSuggestedPrice * exchangeRate).toFixed(2)}
+                        (RMB) ¥{(exwSuggestedPrice * (rateData?.exchangeRate || 1)).toFixed(2)}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
                         利润: {currency} {targetProfit.toFixed(2)}
@@ -871,7 +881,7 @@ export default function QuotationCalculatorDialog({
                         {currency} {fobSuggestedPrice.toFixed(2)}
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
-                        (RMB) ¥{(fobSuggestedPrice * exchangeRate).toFixed(2)}
+                        (RMB) ¥{(fobSuggestedPrice * (rateData?.exchangeRate || 1)).toFixed(2)}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
                         利润: {currency} {targetProfit.toFixed(2)}
@@ -887,7 +897,7 @@ export default function QuotationCalculatorDialog({
                         {currency} {cifSuggestedPrice.toFixed(2)}
                       </div>
                       <div className="text-sm text-purple-600 mt-1 font-medium">
-                        (RMB) ¥{(cifSuggestedPrice * exchangeRate).toFixed(2)}
+                        (RMB) ¥{(cifSuggestedPrice * (rateData?.exchangeRate || 1)).toFixed(2)}
                       </div>
                       <div className="text-xs text-purple-500 mt-1 font-medium">
                         利润: {currency} {targetProfit.toFixed(2)} ⭐
@@ -901,9 +911,9 @@ export default function QuotationCalculatorDialog({
 
           {/* 汇率说明 */}
           <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
-            <span>汇率: 1 {currency} = {exchangeRate.toFixed(4)} CNY</span>
+            <span>汇率: 1 {currency} = {(rateData?.exchangeRate || 1).toFixed(4)} CNY</span>
             <span className="text-xs">
-              {lastUpdate} {isCached && <span className="text-orange-600">(缓存)</span>}
+              {rateData?.lastUpdate} {rateData?.cached && <span className="text-orange-600">(缓存)</span>}
             </span>
           </div>
         </div>
@@ -921,7 +931,7 @@ export default function QuotationCalculatorDialog({
             <div className="bg-white rounded-lg p-3 border">
               <div className="text-xs text-gray-500 mb-1">单笔订单利润</div>
               <div className="text-lg font-bold text-green-600">
-                {currency} {(results.cif.profit * parsedValues.quantity).toFixed(2)}
+                {currency} {((results.cif?.profit || 0) * parsedValues.quantity).toFixed(2)}
               </div>
             </div>
 
@@ -929,7 +939,7 @@ export default function QuotationCalculatorDialog({
               <div className="text-xs text-gray-500 mb-1">投资回收周期</div>
               <div className="text-lg font-bold text-purple-600">
                 {costs.initialInvestment > 0
-                  ? ((results.cif.profit * parsedValues.quantity / costs.initialInvestment) * 100).toFixed(1)
+                  ? (((results.cif?.profit || 0) * parsedValues.quantity / costs.initialInvestment) * 100).toFixed(1)
                   : '0'
                 }%
               </div>
@@ -939,8 +949,8 @@ export default function QuotationCalculatorDialog({
             <div className="bg-white rounded-lg p-3 border">
               <div className="text-xs text-gray-500 mb-1">ROI 回报率</div>
               <div className="text-lg font-bold text-indigo-600">
-                {results.cif.profit > 0
-                  ? Math.ceil(costs.initialInvestment / (results.cif.profit * parsedValues.quantity)).toLocaleString()
+                {(results.cif?.profit || 0) > 0
+                  ? Math.ceil(costs.initialInvestment / ((results.cif?.profit || 0) * parsedValues.quantity)).toLocaleString()
                   : '∞'
                 } 笔订单
               </div>
@@ -956,7 +966,7 @@ export default function QuotationCalculatorDialog({
                 <div className="bg-white rounded-lg p-3 border">
                   <div className="text-xs text-gray-500 mb-1">年度预期利润</div>
                   <div className="text-xl font-bold text-green-600">
-                    {currency} {(results.cif.profit * parsedValues.quantity * costs.expectedVolume).toFixed(2)}
+                    {currency} {((results.cif?.profit || 0) * parsedValues.quantity * costs.expectedVolume).toFixed(2)}
                   </div>
                   <div className="text-xs text-gray-400">
                     基于 {costs.expectedVolume.toLocaleString()} 笔订单
@@ -967,7 +977,7 @@ export default function QuotationCalculatorDialog({
                   <div className="text-xs text-gray-500 mb-1">年度 ROI</div>
                   <div className="text-xl font-bold text-purple-600">
                     {costs.initialInvestment > 0
-                      ? ((results.cif.profit * parsedValues.quantity * costs.expectedVolume / costs.initialInvestment) * 100).toFixed(1)
+                      ? (((results.cif?.profit || 0) * parsedValues.quantity * costs.expectedVolume / costs.initialInvestment) * 100).toFixed(1)
                       : '0'
                     }%
                   </div>
