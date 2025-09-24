@@ -4,6 +4,7 @@ import {
   Calculator,
   BookOpen,
   Globe,
+  Truck,
   LucideIcon
 } from "lucide-react"
 
@@ -16,7 +17,7 @@ export interface Feature {
   color: string
   gradient: string
   workflowId?: string
-  dialogType: 'translate' | 'currency' | 'quote' | 'term' | 'timezone'
+  dialogType: 'translate' | 'currency' | 'quote' | 'term' | 'timezone' | 'logistics'
   defaultInputs?: Record<string, any>
 }
 
@@ -96,6 +97,21 @@ export const features: Feature[] = [
     defaultInputs: {
       from_timezone: 'Asia/Shanghai',
       to_timezone: 'America/New_York'
+    }
+  },
+  {
+    id: 'logistics',
+    title: '物流查询',
+    description: '快递追踪和物流状态查询，支持国内外主流快递公司，实时更新物流信息',
+    icon: Truck,
+    href: '/logistics',
+    color: 'cyan',
+    gradient: 'from-cyan-500 to-blue-500',
+    dialogType: 'logistics',
+    workflowId: 'logistics-tracking',
+    defaultInputs: {
+      carrier: 'auto',
+      trackingNumber: ''
     }
   }
 ]

@@ -32,6 +32,10 @@ const TimezoneDialog = dynamic(() => import('@/components/tool-dialog/TimezoneDi
   loading: () => <div className="p-4 text-center">加载中...</div>
 })
 
+const TrackingDialog = dynamic(() => import('@/components/ui/tracking-dialog').then(mod => ({ default: mod.TrackingDialog })), {
+  loading: () => <div className="p-4 text-center">加载中...</div>
+})
+
 interface FeatureCardProps {
   feature: Feature
   useDialog?: boolean
@@ -45,6 +49,7 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
   const [quotationCalculatorOpen, setQuotationCalculatorOpen] = useState(false)
   const [currencyExchangeOpen, setCurrencyExchangeOpen] = useState(false)
   const [timezoneOpen, setTimezoneOpen] = useState(false)
+  const [logisticsOpen, setLogisticsOpen] = useState(false)
   const Icon = feature.icon
 
   const handleClick = () => {
@@ -79,6 +84,11 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
         setTimezoneOpen(true)
         return
       }
+      if (feature.dialogType === 'logistics') {
+        // 对于物流查询功能，直接渲染 LogisticsTrackingDialog
+        setLogisticsOpen(true)
+        return
+      }
       setDialogOpen(true)
       return
     }
@@ -100,6 +110,8 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
         return null // ModernTermDialog 管理自己的显示状态
       case 'timezone':
         return null // TimezoneDialog 管理自己的显示状态
+      case 'logistics':
+        return null // TrackingDialog 管理自己的显示状态
       default:
         return <div className="p-4 text-center">功能开发中...</div>
     }
@@ -196,6 +208,14 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
           <TimezoneDialog
             open={timezoneOpen}
             onOpenChange={setTimezoneOpen}
+          />
+        </>
+      ) : feature.dialogType === 'logistics' ? (
+        <>
+          {cardContent}
+          <TrackingDialog
+            open={logisticsOpen}
+            onOpenChange={setLogisticsOpen}
           />
         </>
       ) : (
