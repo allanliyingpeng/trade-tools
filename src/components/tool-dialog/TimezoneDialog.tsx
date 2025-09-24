@@ -1,556 +1,283 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { useDifyWorkflow } from '@/hooks/useDifyWorkflow'
-import { useUsageLimits } from '@/hooks/useUsageLimits'
-import { ToolDialogContent, ToolDialogSection } from './ToolDialog'
-import { Clock, Globe, Calendar, ArrowRight, Users, Loader2, AlertCircle, Plus, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import type { Feature } from '@/data/features'
+import React, { useState, useEffect } from 'react'
+import { format, toZonedTime } from 'date-fns-tz'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose
+} from '@/components/ui/dialog' // 假设您使用 shadcn/ui
+import {
+  Clock,
+  Globe,
+  Calendar,
+  X,
+  Search,
+  Users
+} from 'lucide-react'
+import { TRADE_TIMEZONES, REGION_LABELS, type TradeTimezone, getAllRegions } from '@/lib/timezone-data' // 假设数据在单独文件中
 
-interface TimezoneDialogProps {
-  feature: Feature
+// --- 子组件定义 ---
+
+// 左侧控制面板
+const LeftControlPanel = ({
+  selectedTimezones,
+  onTimezoneToggle,
+  mode,
+  onModeChange
+}: any) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  const isMaxSelected = selectedTimezones.length >= 6
+
+  const filteredTimezones = TRADE_TIMEZONES.filter(
+    tz =>
+      tz.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tz.city.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const groupedTimezones = getAllRegions().reduce((acc, region) => {
+    acc[region] = filteredTimezones.filter(tz => tz.region === region)
+    return acc
+  }, {} as Record<string, TradeTimezone[]>)
+
+  return (
+    <div className="p-3 bg-muted/30 border-b lg:border-b-0 lg:border-r border-border flex flex-col space-y-4 h-full min-h-0">
+      {/* 模式切换 */}
+      <div className="p-1 bg-muted rounded-lg grid grid-cols-2 gap-1">
+        <button
+          onClick={() => onModeChange('clocks')}
+          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center justify-center gap-2 transition-all ${
+            mode === 'clocks'
+              ? 'bg-background text-primary shadow-sm ring-1 ring-border'
+              : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
+          }`}
+        >
+          <Clock className="w-4 h-4" /> 实时时钟
+        </button>
+        <button
+          onClick={() => onModeChange('meeting')}
+          className={`px-3 py-2 text-sm font-medium rounded-md flex items-center justify-center gap-2 transition-all ${
+            mode === 'meeting'
+              ? 'bg-background text-primary shadow-sm ring-1 ring-border'
+              : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
+          }`}
+        >
+          <Users className="w-4 h-4" /> 会议安排
+        </button>
+      </div>
+
+      {/* 搜索与选择 */}
+      <div className="bg-background border rounded-lg p-4 shadow-sm flex-1 flex flex-col min-h-0">
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <input
+            type="text"
+            placeholder="搜索国家或城市..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-semibold text-foreground">选择时区</h3>
+          <span className={`text-sm font-medium ${isMaxSelected ? 'text-destructive' : 'text-muted-foreground'}`}>
+            {selectedTimezones.length}/6
+          </span>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2 min-h-0">
+          {Object.entries(groupedTimezones).map(([region, timezones]) => {
+            if (timezones.length === 0) return null
+            return (
+              <div key={region}>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide my-2 px-2">
+                  {REGION_LABELS[region as keyof typeof REGION_LABELS]}
+                </div>
+                {timezones.map(tz => (
+                  <label
+                    key={tz.id}
+                    className={`flex items-center p-3 rounded-md cursor-pointer transition-colors border border-transparent ${
+                      isMaxSelected && !selectedTimezones.includes(tz.timezone)
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:bg-accent hover:border-border'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTimezones.includes(tz.timezone)}
+                      disabled={isMaxSelected && !selectedTimezones.includes(tz.timezone)}
+                      onChange={() => onTimezoneToggle(tz.timezone)}
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-ring focus:ring-2"
+                    />
+                    <span className="ml-3 text-2xl">{tz.flag}</span>
+                    <div className="ml-3 flex-1">
+                      <p className="font-medium text-foreground">{tz.name}</p>
+                      <p className="text-xs text-muted-foreground">{tz.city}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">{tz.utcOffset}</span>
+                  </label>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 }
 
-const timezones = [
-  { value: 'Asia/Shanghai', label: '北京 (UTC+8)', city: '北京', flag: '🇨🇳' },
-  { value: 'America/New_York', label: '纽约 (UTC-5/-4)', city: '纽约', flag: '🇺🇸' },
-  { value: 'America/Los_Angeles', label: '洛杉矶 (UTC-8/-7)', city: '洛杉矶', flag: '🇺🇸' },
-  { value: 'Europe/London', label: '伦敦 (UTC+0/+1)', city: '伦敦', flag: '🇬🇧' },
-  { value: 'Europe/Paris', label: '巴黎 (UTC+1/+2)', city: '巴黎', flag: '🇫🇷' },
-  { value: 'Europe/Berlin', label: '柏林 (UTC+1/+2)', city: '柏林', flag: '🇩🇪' },
-  { value: 'Asia/Tokyo', label: '东京 (UTC+9)', city: '东京', flag: '🇯🇵' },
-  { value: 'Asia/Seoul', label: '首尔 (UTC+9)', city: '首尔', flag: '🇰🇷' },
-  { value: 'Asia/Singapore', label: '新加坡 (UTC+8)', city: '新加坡', flag: '🇸🇬' },
-  { value: 'Asia/Dubai', label: '迪拜 (UTC+4)', city: '迪拜', flag: '🇦🇪' },
-  { value: 'Australia/Sydney', label: '悉尼 (UTC+10/+11)', city: '悉尼', flag: '🇦🇺' },
-  { value: 'Pacific/Auckland', label: '奥克兰 (UTC+12/+13)', city: '奥克兰', flag: '🇳🇿' },
-  { value: 'America/Toronto', label: '多伦多 (UTC-5/-4)', city: '多伦多', flag: '🇨🇦' },
-  { value: 'America/Sao_Paulo', label: '圣保罗 (UTC-3)', city: '圣保罗', flag: '🇧🇷' },
-  { value: 'Asia/Mumbai', label: '孟买 (UTC+5:30)', city: '孟买', flag: '🇮🇳' },
-  { value: 'Africa/Lagos', label: '拉各斯 (UTC+1)', city: '拉各斯', flag: '🇳🇬' },
-  { value: 'Europe/Moscow', label: '莫斯科 (UTC+3)', city: '莫斯科', flag: '🇷🇺' }
-]
+// 右侧时钟卡片
+const ClockCard = ({ timezone, currentTime }: { timezone: string; currentTime: Date }) => {
+  const tzData = TRADE_TIMEZONES.find(tz => tz.timezone === timezone)
+  if (!tzData) return null
 
-const meetingTypes = [
-  { value: 'meeting', label: '会议' },
-  { value: 'call', label: '通话' },
-  { value: 'presentation', label: '演示' },
-  { value: 'interview', label: '面试' },
-  { value: 'training', label: '培训' },
-  { value: 'webinar', label: '网络研讨会' }
-]
+  const zonedTime = toZonedTime(currentTime, timezone)
+  const currentHour = zonedTime.getHours()
+  const { start, end } = tzData.businessHours
+  const isWorking = currentHour >= start && currentHour < end && zonedTime.getDay() > 0 && zonedTime.getDay() < 6
 
-interface WorldClock {
-  id: string
-  timezone: string
-  label: string
+  return (
+    <div className="bg-background border border-border rounded-xl p-4 w-full transition-all hover:shadow-lg">
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-3">
+          <span className="text-4xl">{tzData.flag}</span>
+          <div>
+            <p className="font-bold text-lg text-gray-900">{tzData.name}</p>
+            <p className="text-sm text-gray-500">{tzData.city}</p>
+          </div>
+        </div>
+        <div className={`px-2 py-1 text-xs font-bold rounded-full ${
+            isWorking ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+        }`}>
+            {isWorking ? '工作中' : '休息中'}
+        </div>
+      </div>
+      <div className="text-center my-4">
+        <p className="text-4xl font-bold font-mono text-gray-900">
+          {format(zonedTime, 'HH:mm:ss', { timeZone: timezone })}
+        </p>
+        <p className="text-sm text-gray-600">
+          {format(zonedTime, 'yyyy年MM月dd日, EEEE', { timeZone: timezone })}
+        </p>
+      </div>
+      {/* 工作时间进度条 */}
+      <div className="space-y-1">
+          <div className="flex justify-between text-xs text-gray-500">
+              <span>{String(start).padStart(2, '0')}:00</span>
+              <span>{String(end).padStart(2, '0')}:00</span>
+          </div>
+          <div className="w-full bg-slate-200 rounded-full h-2.5 relative">
+              <div className="absolute bg-green-500 h-2.5 rounded-full"
+                  style={{
+                      left: `${(start / 24) * 100}%`,
+                      width: `${((end - start) / 24) * 100}%`
+                  }}
+              />
+              <div className="absolute h-2.5 w-1 bg-gray-800 rounded-full"
+                  style={{ left: `calc(${(currentHour / 24) * 100}% - 2px)` }}
+              />
+          </div>
+      </div>
+    </div>
+  )
 }
 
-export default function TimezoneDialog({ feature }: TimezoneDialogProps) {
-  const [sourceTime, setSourceTime] = useState('')
-  const [sourceTimezone, setSourceTimezone] = useState('Asia/Shanghai')
-  const [targetTimezones, setTargetTimezones] = useState<string[]>(['America/New_York', 'Europe/London'])
-  const [meetingDate, setMeetingDate] = useState('')
-  const [meetingTime, setMeetingTime] = useState('')
-  const [meetingType, setMeetingType] = useState('meeting')
-  const [worldClocks, setWorldClocks] = useState<WorldClock[]>([
-    { id: '1', timezone: 'Asia/Shanghai', label: '北京' },
-    { id: '2', timezone: 'America/New_York', label: '纽约' },
-    { id: '3', timezone: 'Europe/London', label: '伦敦' }
-  ])
-  const [currentTimes, setCurrentTimes] = useState<Record<string, string>>({})
-  const [conversionResult, setConversionResult] = useState<any>(null)
-
-  const { executeWorkflow, status, error, isLoading, resetState } = useDifyWorkflow()
-  const { canExecute, limitMessage } = useUsageLimits(feature.workflowId)
-
-  // 更新实时时钟
-  useEffect(() => {
-    const updateClocks = () => {
-      const times: Record<string, string> = {}
-      worldClocks.forEach(clock => {
-        const now = new Date()
-        const timeInZone = new Intl.DateTimeFormat('zh-CN', {
-          timeZone: clock.timezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        }).format(now)
-        times[clock.id] = timeInZone
-      })
-      setCurrentTimes(times)
-    }
-
-    updateClocks()
-    const interval = setInterval(updateClocks, 1000)
-    return () => clearInterval(interval)
-  }, [worldClocks])
-
-  const handleTimeConversion = async () => {
-    if (!sourceTime || !canExecute) return
-
-    resetState()
-
-    try {
-      const workflowResult = await executeWorkflow(feature.workflowId!, {
-        source_time: sourceTime,
-        source_timezone: sourceTimezone,
-        target_timezones: targetTimezones,
-        include_business_hours: true,
-        include_recommendations: true
-      })
-
-      if (workflowResult?.status === 'success' && workflowResult.data) {
-        setConversionResult(workflowResult.data)
-      }
-    } catch (error) {
-      console.error('Timezone conversion failed:', error)
-    }
-  }
-
-  const handleMeetingPlanner = async () => {
-    if (!meetingDate || !meetingTime || !canExecute) return
-
-    resetState()
-
-    try {
-      const workflowResult = await executeWorkflow(feature.workflowId!, {
-        meeting_datetime: `${meetingDate}T${meetingTime}`,
-        organizer_timezone: sourceTimezone,
-        participant_timezones: targetTimezones,
-        meeting_type: meetingType,
-        suggest_optimal_time: true
-      })
-
-      if (workflowResult?.status === 'success' && workflowResult.data) {
-        setConversionResult(workflowResult.data)
-      }
-    } catch (error) {
-      console.error('Meeting planning failed:', error)
-    }
-  }
-
-  const addWorldClock = () => {
-    const availableTimezone = timezones.find(tz =>
-      !worldClocks.some(clock => clock.timezone === tz.value)
+// 右侧显示区域
+const RightDisplayPanel = ({ selectedTimezones, currentTime, mode }: any) => {
+  if (mode === 'clocks') {
+    return (
+      <div className="p-3 bg-background overflow-y-auto">
+        {selectedTimezones.length === 0 ? (
+          <div className="text-center flex flex-col items-center justify-center h-full text-muted-foreground">
+            <Globe className="w-16 h-16 mb-4 opacity-50" />
+            <h3 className="text-lg font-semibold text-foreground">请从左侧选择时区</h3>
+            <p className="text-muted-foreground">最多可添加6个时区进行实时对比</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4 h-full content-start">
+            {selectedTimezones.map((tz: string) => (
+              <ClockCard key={tz} timezone={tz} currentTime={currentTime} />
+            ))}
+          </div>
+        )}
+      </div>
     )
-
-    if (availableTimezone) {
-      const newClock: WorldClock = {
-        id: Date.now().toString(),
-        timezone: availableTimezone.value,
-        label: availableTimezone.city
-      }
-      setWorldClocks([...worldClocks, newClock])
-    }
   }
 
-  const removeWorldClock = (id: string) => {
-    if (worldClocks.length > 1) {
-      setWorldClocks(worldClocks.filter(clock => clock.id !== id))
-    }
+  if (mode === 'meeting') {
+      return (
+        <div className="p-3 bg-background overflow-y-auto">
+           <div className="text-center flex flex-col items-center justify-center h-full text-muted-foreground">
+            <Calendar className="w-16 h-16 mb-4 opacity-50" />
+            <h3 className="text-lg font-semibold text-foreground">会议安排功能</h3>
+            <p className="text-muted-foreground">选择多个时区后，这里将为您推荐最佳会议时间。</p>
+            <p className="text-xs mt-2 text-muted-foreground/80">(该功能正在开发中)</p>
+          </div>
+        </div>
+      )
   }
 
-  const updateWorldClock = (id: string, timezone: string) => {
-    const timezoneData = timezones.find(tz => tz.value === timezone)
-    setWorldClocks(worldClocks.map(clock =>
-      clock.id === id
-        ? { ...clock, timezone, label: timezoneData?.city || timezone }
-        : clock
-    ))
-  }
+  return null
+}
 
-  const addTargetTimezone = () => {
-    const available = timezones.find(tz => !targetTimezones.includes(tz.value))
-    if (available) {
-      setTargetTimezones([...targetTimezones, available.value])
-    }
-  }
+// 主弹窗组件
+export const TimezoneDialog = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
+  const [selectedTimezones, setSelectedTimezones] = useState<string[]>(['Asia/Shanghai', 'America/New_York'])
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [mode, setMode] = useState<'clocks' | 'meeting'>('clocks')
 
-  const removeTargetTimezone = (timezone: string) => {
-    if (targetTimezones.length > 1) {
-      setTargetTimezones(targetTimezones.filter(tz => tz !== timezone))
-    }
-  }
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
-  const formatTimeWithStatus = (timeStr: string, timezone: string) => {
-    try {
-      const date = new Date(timeStr)
-      const hour = date.getHours()
-      let status = ''
-      let statusColor = ''
-
-      if (hour >= 9 && hour < 18) {
-        status = '工作时间'
-        statusColor = 'text-green-600'
-      } else if (hour >= 6 && hour < 9) {
-        status = '早晨'
-        statusColor = 'text-yellow-600'
-      } else if (hour >= 18 && hour < 22) {
-        status = '晚间'
-        statusColor = 'text-orange-600'
-      } else {
-        status = '休息时间'
-        statusColor = 'text-red-600'
-      }
-
-      return { time: timeStr, status, statusColor }
-    } catch {
-      return { time: timeStr, status: '', statusColor: '' }
-    }
+  const handleTimezoneToggle = (timezone: string) => {
+    setSelectedTimezones(prev =>
+      prev.includes(timezone)
+        ? prev.filter(tz => tz !== timezone)
+        : [...prev, timezone]
+    )
   }
 
   return (
-    <ToolDialogContent>
-      <ToolDialogSection
-        title="世界时钟"
-        description="查看全球主要城市的当前时间"
-      >
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">实时时钟</h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addWorldClock}
-              disabled={worldClocks.length >= 8}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              添加时钟
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {worldClocks.map((clock) => {
-              const timezoneData = timezones.find(tz => tz.value === clock.timezone)
-              return (
-                <Card key={clock.id} className="relative">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{timezoneData?.flag}</span>
-                        <Select
-                          value={clock.timezone}
-                          onValueChange={(value: string) => updateWorldClock(clock.id, value)}
-                        >
-                          <SelectTrigger className="w-auto border-0 p-0 h-auto">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {timezones.map((tz) => (
-                              <SelectItem key={tz.value} value={tz.value}>
-                                <div className="flex items-center gap-2">
-                                  <span>{tz.flag}</span>
-                                  <span>{tz.city}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {worldClocks.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeWorldClock(clock.id)}
-                          className="h-6 w-6"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-mono font-bold">
-                      {currentTimes[clock.id]?.split(' ')[1] || '--:--:--'}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {currentTimes[clock.id]?.split(' ')[0] || '----/--/--'}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      </ToolDialogSection>
-
-      <Separator />
-
-      <ToolDialogSection
-        title="时间转换"
-        description="转换特定时间到不同时区"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">源时区</label>
-              <Select value={sourceTimezone} onValueChange={setSourceTimezone}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {timezones.map((tz) => (
-                    <SelectItem key={tz.value} value={tz.value}>
-                      <div className="flex items-center gap-2">
-                        <span>{tz.flag}</span>
-                        <span>{tz.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">日期时间</label>
-              <Input
-                type="datetime-local"
-                value={sourceTime}
-                onChange={(e) => setSourceTime(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-end">
-              <Button
-                onClick={handleTimeConversion}
-                disabled={!sourceTime || !canExecute || isLoading}
-                className="w-full"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                )}
-                转换时间
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">目标时区</label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addTargetTimezone}
-                disabled={targetTimezones.length >= 6}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                添加时区
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {targetTimezones.map((timezone) => {
-                const timezoneData = timezones.find(tz => tz.value === timezone)
-                return (
-                  <div key={timezone} className="flex items-center gap-2">
-                    <Select
-                      value={timezone}
-                      onValueChange={(value: string) => {
-                        setTargetTimezones(targetTimezones.map(tz =>
-                          tz === timezone ? value : tz
-                        ))
-                      }}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timezones.map((tz) => (
-                          <SelectItem key={tz.value} value={tz.value}>
-                            <div className="flex items-center gap-2">
-                              <span>{tz.flag}</span>
-                              <span>{tz.label}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {targetTimezones.length > 1 && (
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => removeTargetTimezone(timezone)}
-                        className="h-10 w-10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      </ToolDialogSection>
-
-      <Separator />
-
-      <ToolDialogSection
-        title="会议规划"
-        description="为跨时区会议找到最佳时间"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">会议日期</label>
-            <Input
-              type="date"
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">会议时间</label>
-            <Input
-              type="time"
-              value={meetingTime}
-              onChange={(e) => setMeetingTime(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">会议类型</label>
-            <Select value={meetingType} onValueChange={setMeetingType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {meetingTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-end">
-            <Button
-              onClick={handleMeetingPlanner}
-              disabled={!meetingDate || !meetingTime || !canExecute || isLoading}
-              className="w-full"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Calendar className="h-4 w-4 mr-2" />
-              )}
-              规划会议
-            </Button>
-          </div>
-        </div>
-      </ToolDialogSection>
-
-      {limitMessage && (
-        <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-sm font-medium">{limitMessage}</span>
-          </div>
-        </div>
-      )}
-
-      {/* 结果显示 */}
-      {(status === 'success' || status === 'error') && (
-        <ToolDialogSection title="转换结果">
-          {status === 'error' ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-center space-y-2">
-                <AlertCircle className="h-6 w-6 mx-auto text-red-500" />
-                <p className="text-sm text-red-600">{error || '时区转换失败'}</p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[85vw] w-full sm:max-w-[90vw] lg:max-w-6xl xl:max-w-7xl h-[85vh] sm:h-[92vh] p-0 flex flex-col overflow-hidden" showCloseButton={false}>
+        <DialogHeader className="px-4 sm:px-6 py-4 bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 text-white flex-shrink-0 border-b">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <Globe className="w-6 h-6" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold text-white">外贸时区助手</DialogTitle>
+                <p className="text-sm text-blue-100">全球时间协调与会议安排</p>
               </div>
             </div>
-          ) : conversionResult ? (
-            <div className="space-y-4">
-              {conversionResult.conversions && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {conversionResult.conversions.map((conversion: any, index: number) => {
-                    const timezoneData = timezones.find(tz => tz.value === conversion.timezone)
-                    const timeInfo = formatTimeWithStatus(conversion.converted_time, conversion.timezone)
-
-                    return (
-                      <Card key={index}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{timezoneData?.flag}</span>
-                              <span className="font-medium">{timezoneData?.city || conversion.timezone}</span>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={cn("text-xs", timeInfo.statusColor)}
-                            >
-                              {timeInfo.status}
-                            </Badge>
-                          </div>
-                          <div className="text-lg font-mono font-bold">
-                            {new Date(conversion.converted_time).toLocaleString('zh-CN')}
-                          </div>
-                          {conversion.is_business_hours !== undefined && (
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {conversion.is_business_hours ? '✅ 工作时间' : '❌ 非工作时间'}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-
-              {conversionResult.optimal_times && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      推荐会议时间
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {conversionResult.optimal_times.slice(0, 3).map((time: any, index: number) => (
-                        <div key={index} className="p-3 bg-muted/50 rounded-lg">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium">
-                                选项 {index + 1}: {new Date(time.datetime).toLocaleString('zh-CN')}
-                              </div>
-                              <div className="text-sm text-muted-foreground mt-1">
-                                适合度: {time.suitability_score}/100
-                              </div>
-                            </div>
-                            <Badge variant={time.suitability_score >= 80 ? 'default' : 'secondary'}>
-                              {time.suitability_score >= 80 ? '推荐' : '可选'}
-                            </Badge>
-                          </div>
-                          {time.notes && (
-                            <div className="text-sm text-muted-foreground mt-2">
-                              {time.notes}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : null}
-        </ToolDialogSection>
-      )}
-    </ToolDialogContent>
+            <DialogClose asChild>
+              <button className="self-end sm:self-auto p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20">
+                <X className="w-5 h-5" />
+                <span className="sr-only">关闭</span>
+              </button>
+            </DialogClose>
+          </div>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[450px_1fr]">
+          <LeftControlPanel
+            selectedTimezones={selectedTimezones}
+            onTimezoneToggle={handleTimezoneToggle}
+            mode={mode}
+            onModeChange={setMode}
+          />
+          <RightDisplayPanel
+            selectedTimezones={selectedTimezones}
+            currentTime={currentTime}
+            mode={mode}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

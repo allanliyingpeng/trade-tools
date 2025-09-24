@@ -28,7 +28,7 @@ const ModernTermDialog = dynamic(() => import('@/components/tool-dialog/ModernTe
   loading: () => <div className="p-4 text-center">加载中...</div>
 })
 
-const TimezoneDialog = dynamic(() => import('@/components/tool-dialog/TimezoneDialog'), {
+const TimezoneDialog = dynamic(() => import('@/components/tool-dialog/TimezoneDialog').then(mod => ({ default: mod.TimezoneDialog })), {
   loading: () => <div className="p-4 text-center">加载中...</div>
 })
 
@@ -44,6 +44,7 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
   const [modernTranslateOpen, setModernTranslateOpen] = useState(false)
   const [quotationCalculatorOpen, setQuotationCalculatorOpen] = useState(false)
   const [currencyExchangeOpen, setCurrencyExchangeOpen] = useState(false)
+  const [timezoneOpen, setTimezoneOpen] = useState(false)
   const Icon = feature.icon
 
   const handleClick = () => {
@@ -73,6 +74,11 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
         setCurrencyExchangeOpen(true)
         return
       }
+      if (feature.dialogType === 'timezone') {
+        // 对于时区功能，直接渲染 TimezoneDialog
+        setTimezoneOpen(true)
+        return
+      }
       setDialogOpen(true)
       return
     }
@@ -93,14 +99,14 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
       case 'term':
         return null // ModernTermDialog 管理自己的显示状态
       case 'timezone':
-        return <TimezoneDialog feature={feature} />
+        return null // TimezoneDialog 管理自己的显示状态
       default:
         return <div className="p-4 text-center">功能开发中...</div>
     }
   }
 
   const cardContent = (
-    <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 w-full h-full flex flex-col">
       <div
         className={cn(
           "absolute inset-0 bg-gradient-to-br opacity-5 group-hover:opacity-10 transition-opacity",
@@ -108,7 +114,7 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
         )}
       />
 
-      <CardHeader className="relative">
+      <CardHeader className="relative pb-4">
         <div className="flex items-center gap-3">
           <div
             className={cn(
@@ -124,13 +130,13 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="relative">
-        <CardDescription className="mb-4 text-sm leading-relaxed">
+      <CardContent className="relative flex-1 flex flex-col justify-between">
+        <CardDescription className="text-sm leading-relaxed mb-6">
           {feature.description}
         </CardDescription>
 
         <Button
-          className="w-full group-hover:bg-primary/90"
+          className="w-full group-hover:bg-primary/90 mt-auto"
           onClick={user && useDialog ? handleClick : undefined}
           asChild={!user || !useDialog}
         >
@@ -182,6 +188,14 @@ export function FeatureCard({ feature, useDialog = true }: FeatureCardProps) {
           <CurrencyExchangeDialog
             open={currencyExchangeOpen}
             onOpenChange={setCurrencyExchangeOpen}
+          />
+        </>
+      ) : feature.dialogType === 'timezone' ? (
+        <>
+          {cardContent}
+          <TimezoneDialog
+            open={timezoneOpen}
+            onOpenChange={setTimezoneOpen}
           />
         </>
       ) : (

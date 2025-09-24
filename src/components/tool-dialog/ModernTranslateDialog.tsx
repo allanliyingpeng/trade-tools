@@ -285,12 +285,12 @@ export default function ModernTranslateDialog({ open, onOpenChange }: ModernTran
       }} />
       {/* 背景遮罩 */}
       <div
-        className="absolute inset-0 bg-black/20"
+        className="absolute inset-0 bg-black/50 animate-in fade-in-0 duration-200"
         onClick={() => onOpenChange(false)}
       />
 
       {/* 弹窗主体 */}
-      <div className="relative w-[900px] max-h-[90vh] bg-white rounded-xl shadow-lg flex flex-col overflow-hidden">
+      <div className="relative w-[900px] max-h-[90vh] bg-white rounded-xl shadow-lg flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
         {/* 头部区域 */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           {/* 左侧标题 */}

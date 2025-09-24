@@ -71,7 +71,9 @@ export default function HomePage() {
           <div className="max-w-6xl mx-auto">
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 justify-items-center">
               {features.map((feature) => (
-                <FeatureCard key={feature.id} feature={feature} />
+                <div key={feature.id} className="w-full max-w-[380px] min-h-[280px] flex">
+                  <FeatureCard feature={feature} />
+                </div>
               ))}
             </div>
           </div>

@@ -24,7 +24,7 @@ export const features: Feature[] = [
   {
     id: 'translator',
     title: '智能翻译',
-    description: '基于AI的专业外贸翻译，支持批量翻译和历史记录',
+    description: '基于AI的专业外贸翻译，支持批量翻译和历史记录，支持多国语言互译，快速准确',
     icon: Languages,
     href: '/translator',
     color: 'blue',
@@ -40,7 +40,7 @@ export const features: Feature[] = [
   {
     id: 'exchange',
     title: '实时汇率',
-    description: '智能汇率查询和计算，支持150+货币实时转换',
+    description: '智能汇率查询和计算，支持常用国家货币互转，参考国际汇率标准自动更新',
     icon: TrendingUp,
     href: '/exchange-rates',
     color: 'green',
@@ -56,7 +56,7 @@ export const features: Feature[] = [
   {
     id: 'quotation',
     title: '报价计算器',
-    description: '智能计算FOB/CIF/EXW价格，一键生成专业报价单',
+    description: '管理产品成本，国际费用，ROI投资分析，智能计算FOB/CIF/EXW价格，生成专业报价单',
     icon: Calculator,
     href: '/quotation',
     color: 'purple',
@@ -71,7 +71,7 @@ export const features: Feature[] = [
   {
     id: 'glossary',
     title: '术语速查',
-    description: '收录Incoterms 2020等500+专业术语，智能查询和解释',
+    description: '收录Incoterms 常用专业术语，智能查询和解释，目前正在持续收录中，解决外贸人术语痛点',
     icon: BookOpen,
     href: '/glossary',
     color: 'orange',

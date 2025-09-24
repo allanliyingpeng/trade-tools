@@ -232,12 +232,12 @@ export default function CurrencyExchangeDialog({ open, onOpenChange }: CurrencyE
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 背景遮罩 */}
       <div
-        className="absolute inset-0 bg-black/20"
+        className="absolute inset-0 bg-black/50 animate-in fade-in-0 duration-200"
         onClick={() => onOpenChange(false)}
       />
 
       {/* 弹窗主体 */}
-      <div className="relative w-[900px] max-h-[90vh] bg-white rounded-xl shadow-xl overflow-hidden">
+      <div className="relative w-[900px] max-h-[90vh] bg-white rounded-xl shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
         {/* 渐变头部 */}
         <div className="px-6 py-4 bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 text-white">
           <div className="flex items-center justify-between">

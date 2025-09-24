@@ -481,7 +481,7 @@ export default function QuotationCalculatorDialog({
         </div>
 
         {/* 缓存状态指示器 */}
-        {rateData && (
+        {/* {rateData && (
           <div className="mt-3">
             <CacheStatusIndicator
               isCached={rateData.cached}
@@ -496,7 +496,7 @@ export default function QuotationCalculatorDialog({
               className="text-xs"
             />
           </div>
-        )}
+        )} */}
       </div>
 
       {/* 产品成本 */}
@@ -508,7 +508,7 @@ export default function QuotationCalculatorDialog({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-gray-600 mb-1 block">产品成本</label>
+              <label className="text-sm text-gray-600 mb-1 block">EXW成本(也可是采购成本)</label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -900,7 +900,7 @@ export default function QuotationCalculatorDialog({
                         (RMB) ¥{(cifSuggestedPrice * (rateData?.exchangeRate || 1)).toFixed(2)}
                       </div>
                       <div className="text-xs text-purple-500 mt-1 font-medium">
-                        利润: {currency} {targetProfit.toFixed(2)} ⭐
+                        利润: {currency} {targetProfit.toFixed(2)} 
                       </div>
                     </div>
                   </div>
@@ -913,7 +913,7 @@ export default function QuotationCalculatorDialog({
           <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
             <span>汇率: 1 {currency} = {(rateData?.exchangeRate || 1).toFixed(4)} CNY</span>
             <span className="text-xs">
-              {rateData?.lastUpdate} {rateData?.cached && <span className="text-orange-600">(缓存)</span>}
+              (汇率每个6小时自动更新)
             </span>
           </div>
         </div>
@@ -1008,8 +1008,6 @@ export default function QuotationCalculatorDialog({
             data-[state=open]:animate-in data-[state=closed]:animate-out
             data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0
             data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95
-            data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]
-            data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]
             duration-200
           "
         >
