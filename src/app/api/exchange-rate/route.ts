@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
   // 缓存未命中或强制刷新，调用API
   try {
     console.log(`🌐 API调用: ${from}→${to}`)
-    const apiKey = process.env.EXCHANGE_RATE_API_KEY
+    const apiKey = process.env.EXCHANGERATE_API_KEY
 
     if (!apiKey || apiKey === 'your_api_key_here') {
       throw new Error('API密钥未配置')
@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
 // 异步更新缓存函数
 async function updateCacheAsync(from: string, to: string): Promise<void> {
   try {
-    const apiKey = process.env.EXCHANGE_RATE_API_KEY
+    const apiKey = process.env.EXCHANGERATE_API_KEY
     if (!apiKey || apiKey === 'your_api_key_here') return
 
     const response = await fetch(
@@ -281,7 +281,7 @@ export async function POST(request: NextRequest) {
         } else {
           // 缓存未命中，调用API
           try {
-            const apiKey = process.env.EXCHANGE_RATE_API_KEY
+            const apiKey = process.env.EXCHANGERATE_API_KEY
             if (apiKey && apiKey !== 'your_api_key_here') {
               const response = await fetch(
                 `https://v6.exchangerate-api.com/v6/${apiKey}/pair/${baseCurrency}/${targetCurrency}/1`

@@ -28,7 +28,7 @@ const LANGUAGE_MAP: Record<string, { code: string; name: string; nativeName: str
 }
 
 // 初始化Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
 // 缓存最近的翻译结果以提高响应速度
 const translationCache = new Map<string, { result: string; timestamp: number }>()
@@ -111,7 +111,7 @@ const translateWithGemini = async (text: string, from: string, to: string): Prom
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       // 检查API密钥
-      if (!process.env.GEMINI_API_KEY) {
+      if (!process.env.GOOGLE_AI_API_KEY) {
         throw new Error('Gemini API key not configured')
       }
 
